@@ -1,0 +1,34 @@
+{
+
+  "manifest_version": 2,
+  "name": "Linkhut Companion",
+  "description": "Save bookmarks to linkhut",
+  "version": "0.1",
+  "homepage_url": "https://ln.ht/~pyrho/linkhut-webext",
+  "icons": {
+    "48": "icons/icon.svg"
+  },
+  "permissions": [
+    "activeTab",
+    "identity",
+    "storage",
+    "<all_urls>"
+  ],
+  "browser_specific_settings": {
+      "gecko": {
+          "id": "linkhut-companion@ln.ht",
+          "strict_min_version": "80.0"
+      }
+  },
+  "browser_action": {
+    "default_icon": "icons/icon.svg",
+    "default_title": "Linkhut",
+    "default_popup": "popup/linkhut.html"
+  },
+  "background": {
+        "page": "background/background.html"
+    },
+  "options_ui": {
+    "page": "options/options.html"
+  }
+}
