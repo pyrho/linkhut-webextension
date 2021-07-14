@@ -51,17 +51,14 @@ function getCodeFromCallbackUrl(redirectUri) {
 }
 
 async function getCredentialsFromGrantCode(redirectURL) {
-    const getTokenRequest = new Request(
-        `${CONSTANTS.tokenUrl}\
-?grant_type=authorization_code\
-&client_id=${CLIENT_ID}\
-&redirect_uri=${encodeURIComponent(REDIRECT_URL)}\
-&client_secret=${CLIENT_SECRET}\
-&code=${getCodeFromCallbackUrl(redirectURL)}`,
-        {
-            method: "POST",
-        },
-    );
+    const url = new URL(CONSTANTS.tokenUrl);
+    url.search = new URLSearchParams({
+        grant_type: "authorization_code",
+        client_id: CLIENT_ID,
+        redirect_uri: REDIRECT_URL,
+        client_secret: CLIENT_SECRET,
+        code: getCodeFromCallbackUrl(redirectURL),
+    }).toString();
 
     function getTokensFromServerResponse(response) {
         return new Promise((resolve, reject) => {
@@ -84,7 +81,7 @@ async function getCredentialsFromGrantCode(redirectURL) {
         });
     }
 
-    return fetch(getTokenRequest).then(getTokensFromServerResponse);
+    return fetch(url, { method: "POST" }).then(getTokensFromServerResponse);
 }
 
 /**
@@ -100,7 +97,9 @@ function authorize() {
 }
 
 async function storeCredentials(credentials) {
-    logger.debug("Storing credentials in local storage");
+    logger.debug(
+        "Storing credentials in local storage" + JSON.stringify(credentials),
+    );
     return browser.storage.local.set({ credentials });
 }
 

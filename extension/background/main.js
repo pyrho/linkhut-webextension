@@ -1,6 +1,6 @@
 import { getAccessToken } from "/background/authorize.js";
 
-function handleMessage(request /*sender, sendResponse*/) {
+function handleMessage(request) {
     const action = (() => {
         switch (request.type) {
             case "auth":
@@ -8,7 +8,9 @@ function handleMessage(request /*sender, sendResponse*/) {
         }
     })();
 
-    action().then(() => browser.runtime.sendMessage({ action: "refreshUI" }));
+    action().catch(e => {
+        console.error(e);
+    });
 }
 //;
 

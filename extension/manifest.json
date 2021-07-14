@@ -23,7 +23,7 @@
   "browser_action": {
     "default_icon": "icons/icon.svg",
     "default_title": "Linkhut",
-    "default_popup": "popup/linkhut.html"
+    "default_popup": "popup/popup.html"
   },
   "background": {
         "page": "background/background.html"

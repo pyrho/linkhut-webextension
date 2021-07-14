@@ -15,3 +15,9 @@ sign: build
 # Package the extension and load a temporary Firefox instance with the extension
 debug:
     @npx web-ext run --verbose -s extension
+
+elm-popup:
+    @elm make src/elm/Popup.elm --output extension/popup/elm-popup.js
+
+elm-debug:
+    @elm-live src/elm/Popup.elm --start-page=extension/popup/popup.html -- --output=extension/popup/elm.js
