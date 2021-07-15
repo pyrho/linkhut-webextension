@@ -1,6 +1,10 @@
 port module Popup exposing (main)
 
+{-| The module represents the contents of the extension popup.
+-}
+
 import Browser
+import Config
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
@@ -10,6 +14,7 @@ import Element.Region as Region
 import Html
 import Http
 import Json.Decode as D
+import Json.Encode
 import Url.Builder as B
 
 
@@ -73,20 +78,31 @@ black =
 -- MODEL
 
 
-type alias SendMessage =
-    { action : String }
+type SendMessage
+    = StartAuthorizationMessage
+    | LinkSavedMessage
+
+
+type alias JSMessage =
+    { action : String
+    , data : Json.Encode.Value
+    }
+
+
+type alias ReceivedMessage =
+    JSMessage
 
 
 type Page
     = AuthorizePage
     | SaveLinkPage
     | SaveSuccess
-    | SaveFailure Http.Error
+    | SaveFailure String
 
 
 type Msg
     = StartAuthorization
-    | Recv String
+    | Recv ReceivedMessage
     | UpdateUrl String
     | UpdateTitle String
     | UpdateNote String
@@ -94,6 +110,9 @@ type Msg
     | SendIt
     | LinkAdded (Result Http.Error String)
 
+
+
+{--
 
 type alias SaveLinkModel =
     { url : String
@@ -111,6 +130,7 @@ type alias AccessToken =
 type Model2
     = LoggedOutModel (Maybe AccessToken)
     | LoggedInModel SaveLinkModel
+--}
 
 
 type alias Model =
@@ -123,6 +143,13 @@ type alias Model =
     }
 
 
+{-| Flags sent from JS land.
+
+    title: is the title of the web page to save
+    url: is the url of the web page to save
+    accessToken: is retrieved from local storage
+
+-}
 type alias Flags =
     { title : Maybe String
     , url : Maybe String
@@ -134,11 +161,6 @@ type alias Flags =
 -- INIT
 
 
-{-| The refreshToken passed as Flags can be Nothing
-
-    flags(refreshToken): the browser.storage stored refreshToken or null if not present
-
--}
 init : Flags -> ( Model, Cmd Msg )
 init { title, url, accessToken } =
     ( { currentPage =
@@ -175,10 +197,18 @@ update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case msg of
         StartAuthorization ->
-            ( model, sendMessage { action = "auth" } )
+            ( model, messageToJs StartAuthorizationMessage )
 
-        Recv _ ->
-            ( model, Cmd.none )
+        Recv { action } ->
+            case action of
+                "authSuccess" ->
+                    ( { model | currentPage = SaveLinkPage }, Cmd.none )
+
+                "error" ->
+                    ( { model | currentPage = SaveFailure "cannot auth" }, Cmd.none )
+
+                _ ->
+                    ( model, Cmd.none )
 
         UpdateUrl newUrl ->
             ( { model | url = Just newUrl }, Cmd.none )
@@ -195,10 +225,10 @@ update msg model =
         LinkAdded x ->
             case x of
                 Ok _ ->
-                    ( { model | currentPage = SaveSuccess }, sendMessage { action = "success" } )
+                    ( { model | currentPage = SaveSuccess }, messageToJs LinkSavedMessage )
 
-                Err e ->
-                    ( { model | currentPage = SaveFailure e }, Cmd.none )
+                Err _ ->
+                    ( { model | currentPage = SaveFailure "Cannot add link" }, Cmd.none )
 
         SendIt ->
             ( model, postLink model )
@@ -207,12 +237,9 @@ update msg model =
 postLink : Model -> Cmd Msg
 postLink model =
     let
-        base =
-            "http://10-25-47-4.sslip.io:4000/_"
-
         url : String
         url =
-            B.crossOrigin base
+            B.crossOrigin Config.apiBaseUrl
                 [ "v1", "posts", "add" ]
                 [ B.string "description" (justOrEmptyString model.title)
                 , B.string "extended" (justOrEmptyString model.note)
@@ -299,7 +326,7 @@ saveLinkView model =
             ]
     in
     layout <|
-        E.column [ E.width E.fill, E.padding 10, E.spacing 10 ]
+        E.column [ E.width E.fill, E.padding 10, E.spacing 20 ]
             [ header
             , Input.text textInputStyle
                 { text = justOrEmptyString model.title
@@ -352,6 +379,8 @@ authorizeView =
             ]
 
 
+{-| The view once the link has been saved
+-}
 successView : Html.Html Msg
 successView =
     layout <|
@@ -367,8 +396,10 @@ successView =
             ]
 
 
-failureView : Http.Error -> Html.Html Msg
-failureView _ =
+{-| The view if there was an error
+-}
+failureView : String -> Html.Html Msg
+failureView errorMsg =
     layout <|
         E.column [ E.width E.fill, E.padding 10 ]
             [ header
@@ -382,7 +413,9 @@ failureView _ =
                 , Font.color <| E.rgb255 255 0 0
                 ]
               <|
-                E.text "An error occured t__t"
+                E.text <|
+                    "An error occured t__t"
+                        ++ errorMsg
             ]
 
 
@@ -420,7 +453,19 @@ main =
 -- PORTS
 
 
-port sendMessage : SendMessage -> Cmd msg
+{-| Helper function to send messages to JS land.
+-}
+messageToJs : SendMessage -> Cmd msg
+messageToJs msg =
+    case msg of
+        StartAuthorizationMessage ->
+            sendMessage { action = "auth", data = Json.Encode.null }
+
+        LinkSavedMessage ->
+            sendMessage { action = "success", data = Json.Encode.null }
 
 
-port messageReceiver : (String -> msg) -> Sub msg
+port sendMessage : JSMessage -> Cmd msg
+
+
+port messageReceiver : (ReceivedMessage -> msg) -> Sub msg
