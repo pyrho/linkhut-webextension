@@ -39,16 +39,6 @@ createButton label msg =
         }
 
 
-justOrEmptyString : Maybe String -> String
-justOrEmptyString j =
-    case j of
-        Just e ->
-            e
-
-        Nothing ->
-            ""
-
-
 
 -- CONSTANTS
 
@@ -69,40 +59,38 @@ black =
 
 
 
--- cyan : E.Color
--- cyan =
---     E.rgb255 0 255 215
--- darkCyan : E.Color
--- darkCyan =
---     E.rgb255 5 170 145
 -- MODEL
+
+
+type Model
+    = Unauthorized
+    | SavePage AccessToken Link
+    | ShowError String
+    | SaveSuccess
 
 
 type SendMessage
     = StartAuthorizationMessage
     | LinkSavedMessage
+    | GetTabInfoMessage
 
 
 type alias JSMessage =
     { action : String
-    , data : Json.Encode.Value
+    , data : Maybe Json.Encode.Value
     }
 
 
-type alias ReceivedMessage =
-    JSMessage
-
-
-type Page
-    = AuthorizePage
-    | SaveLinkPage
-    | SaveSuccess
-    | SaveFailure String
+type alias JSMessageGetTabInfo =
+    { url : String
+    , title : String
+    , accessToken : String
+    }
 
 
 type Msg
     = StartAuthorization
-    | Recv ReceivedMessage
+    | Recv JSMessage
     | UpdateUrl String
     | UpdateTitle String
     | UpdateNote String
@@ -111,36 +99,38 @@ type Msg
     | LinkAdded (Result Http.Error String)
 
 
+{-| Represents a link to be saved via the API
 
-{--
+Maybe's represent optional fields in the /posts/add request.
 
-type alias SaveLinkModel =
+-}
+type alias Link =
     { url : String
-    , title : String
-    , notes : Maybe String
+    , description : String
+    , extended : Maybe String
     , tags : Maybe String
-    , accessToken : String
+    , dt : Maybe String
+    , replace : Bool
+    , shared : Bool
     }
+
+
+newLink : { title : String, url : String } -> Link
+newLink { title, url } =
+    Link
+        url
+        title
+        Nothing
+        Nothing
+        Nothing
+        -- We default to "Replace:yes" because as of 2021-07-20 the API will
+        -- return "something went wrong" if the link already exists
+        True
+        True
 
 
 type alias AccessToken =
     String
-
-
-type Model2
-    = LoggedOutModel (Maybe AccessToken)
-    | LoggedInModel SaveLinkModel
---}
-
-
-type alias Model =
-    { currentPage : Page
-    , accessToken : Maybe String
-    , url : Maybe String
-    , note : Maybe String
-    , title : Maybe String
-    , tags : Maybe String
-    }
 
 
 {-| Flags sent from JS land.
@@ -163,21 +153,15 @@ type alias Flags =
 
 init : Flags -> ( Model, Cmd Msg )
 init { title, url, accessToken } =
-    ( { currentPage =
-            case accessToken of
-                Just _ ->
-                    SaveLinkPage
+    case ( title, url, accessToken ) of
+        ( Just title_, Just url_, Just accessToken_ ) ->
+            ( SavePage accessToken_ (newLink { title = title_, url = url_ }), Cmd.none )
 
-                Nothing ->
-                    AuthorizePage
-      , accessToken = accessToken
-      , url = url
-      , title = title
-      , note = Nothing
-      , tags = Nothing
-      }
-    , Cmd.none
-    )
+        ( _, _, Nothing ) ->
+            ( Unauthorized, Cmd.none )
+
+        _ ->
+            ( ShowError "Unexpected state at init", Cmd.none )
 
 
 
@@ -193,68 +177,187 @@ subscriptions _ =
 -- UPDATE
 
 
+tabInfoDecoder : D.Decoder JSMessageGetTabInfo
+tabInfoDecoder =
+    D.map3 JSMessageGetTabInfo
+        (D.field "url" D.string)
+        (D.field "title" D.string)
+        (D.field "accessToken" D.string)
+
+
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
-    case msg of
-        StartAuthorization ->
+    case ( msg, model ) of
+        ( StartAuthorization, _ ) ->
             ( model, messageToJs StartAuthorizationMessage )
 
-        Recv { action } ->
-            case action of
-                "authSuccess" ->
-                    ( { model | currentPage = SaveLinkPage }, Cmd.none )
+        ( Recv { action, data }, _ ) ->
+            case ( action, data ) of
+                -- After the user did "Authorize" but things turned to shit
+                ( "error", _ ) ->
+                    ( ShowError "Error from JS land.", Cmd.none )
 
-                "error" ->
-                    ( { model | currentPage = SaveFailure "cannot auth" }, Cmd.none )
+                -- After the user did "Authorize" and everything went well
+                ( "authSuccess", _ ) ->
+                    ( model, messageToJs GetTabInfoMessage )
+
+                -- After successful authorization, we explicitely ask the JS for the
+                -- updated data.
+                --
+                -- @NOTE
+                --  this data could be passed on directly via the `authSuccess`
+                --  message but I wanted to try out a more complex flow (:
+                --    - dr, 2021-07-20
+                ( "tabInfo", Just data_ ) ->
+                    case D.decodeValue tabInfoDecoder data_ of
+                        Ok v ->
+                            ( SavePage v.accessToken <| newLink { title = v.title, url = v.url }
+                            , Cmd.none
+                            )
+
+                        Err e ->
+                            ( ShowError <| "Failed to decode tabInfo: " ++ D.errorToString e
+                            , Cmd.none
+                            )
+
+                ( "tabInfo", Nothing ) ->
+                    ( ShowError <| "TabInfo had null data key", Cmd.none )
 
                 _ ->
+                    ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
+
+        {--
+            case action of
+                "authSuccess" ->
+                    ( model, messageToJs GetTabInfoMessage )
+
+                "tabInfo" ->
+                    case data of
+                        Just data_ ->
+                            case D.decodeValue tabInfoDecoder data_ of
+                                Ok v ->
+                                    ( SavePage v.accessToken <| newLink { title = v.title, url = v.url }
+                                    , Cmd.none
+                                    )
+
+                                Err e ->
+                                    ( ShowError <| "Failed to decode tabInfo: " ++ D.errorToString e
+                                    , Cmd.none
+                                    )
+
+                        Nothing ->
+                            ( ShowError <| "Unexpected message from JS " ++ action
+                            , Cmd.none
+                            )
+
+                "error" ->
                     ( model, Cmd.none )
 
-        UpdateUrl newUrl ->
-            ( { model | url = Just newUrl }, Cmd.none )
+                _ ->
+                    ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
+-}
+        ( UpdateUrl newUrl, SavePage token link ) ->
+            ( SavePage token { link | url = newUrl }, Cmd.none )
 
-        UpdateTitle newTitle ->
-            ( { model | title = Just newTitle }, Cmd.none )
+        ( UpdateTitle newTitle, SavePage token link ) ->
+            ( SavePage token { link | description = newTitle }, Cmd.none )
 
-        UpdateNote newNote ->
-            ( { model | note = Just newNote }, Cmd.none )
+        ( UpdateNote newNote, SavePage token link ) ->
+            ( SavePage token { link | extended = Just newNote }, Cmd.none )
 
-        UpdateTags newTags ->
-            ( { model | tags = Just newTags }, Cmd.none )
+        ( UpdateTags newTags, SavePage token link ) ->
+            ( SavePage token { link | tags = Just newTags }, Cmd.none )
 
-        LinkAdded x ->
-            case x of
-                Ok _ ->
-                    ( { model | currentPage = SaveSuccess }, messageToJs LinkSavedMessage )
+        ( SendIt, SavePage token link ) ->
+            ( model, postLink token link )
 
-                Err _ ->
-                    ( { model | currentPage = SaveFailure "Cannot add link" }, Cmd.none )
+        ( LinkAdded res, _ ) ->
+            case res of
+                Ok apiResponseCode ->
+                    case apiResponseCode of
+                        "done" ->
+                            ( SaveSuccess, messageToJs LinkSavedMessage )
 
-        SendIt ->
-            ( model, postLink model )
+                        _ ->
+                            ( ShowError <| "Failed adding link, api said: " ++ apiResponseCode
+                            , Cmd.none
+                            )
+
+                Err httpError ->
+                    let
+                        errString =
+                            case httpError of
+                                Http.BadUrl x ->
+                                    "BadUrl: " ++ x
+
+                                Http.Timeout ->
+                                    "Timeout"
+
+                                Http.NetworkError ->
+                                    "NetErr"
+
+                                Http.BadStatus x ->
+                                    "BadStatus: " ++ String.fromInt x
+
+                                Http.BadBody x ->
+                                    "BadBody: " ++ x
+                    in
+                    ( ShowError <| "There was an error with the request" ++ errString, Cmd.none )
+
+        ( _, _ ) ->
+            ( ShowError "Unexpected state at update", Cmd.none )
 
 
-postLink : Model -> Cmd Msg
-postLink model =
+postLink : AccessToken -> Link -> Cmd Msg
+postLink token { url, description, extended, tags, dt, replace, shared } =
     let
-        url : String
-        url =
+        boolToApiString : Bool -> String
+        boolToApiString b =
+            if b then
+                "yes"
+
+            else
+                "no"
+
+        mandatoryParameters : List ( String, String )
+        mandatoryParameters =
+            [ ( "description", description )
+            , ( "url", url )
+            -- , ( "replace", boolToApiString replace )
+            , ( "shared", boolToApiString shared )
+            ]
+
+        optionalParameters : List ( String, String )
+        optionalParameters =
+            [ ( "extended", extended )
+            , ( "tags", tags )
+            , ( "dt", dt )
+            ]
+                |> List.filterMap (\( name, value ) -> Maybe.map (Tuple.pair name) value)
+
+        queryParameters : List B.QueryParameter
+        queryParameters =
+            mandatoryParameters
+                ++ optionalParameters
+                |> List.map (\( n, v ) -> B.string n v)
+
+        builtUrl : String
+        builtUrl =
             B.crossOrigin Config.apiBaseUrl
                 [ "v1", "posts", "add" ]
-                [ B.string "description" (justOrEmptyString model.title)
-                , B.string "extended" (justOrEmptyString model.note)
-                , B.string "url" (justOrEmptyString model.url)
-                , B.string "tags" (justOrEmptyString model.tags)
-                ]
-    in
-    Http.request
-        { method = "GET"
-        , headers =
+                queryParameters
+
+        headers =
             [ Http.header "Accept" "application/json"
             , Http.header "Content-Type" "application/json"
-            , Http.header "Authorization" <| "Bearer " ++ justOrEmptyString model.accessToken
+            , Http.header "Authorization" <| "Bearer " ++ token
             ]
-        , url = url
+    in
+    Debug.log builtUrl
+    Http.request
+        { method = "GET"
+        , headers = headers
+        , url = builtUrl
         , body = Http.emptyBody
         , timeout = Nothing
         , tracker = Nothing
@@ -312,8 +415,8 @@ layout =
 
 {-| The view element used to save links
 -}
-saveLinkView : Model -> Html.Html Msg
-saveLinkView model =
+saveLinkView : Link -> Html.Html Msg
+saveLinkView link =
     let
         labelStyle =
             [ Font.extraBold
@@ -329,7 +432,7 @@ saveLinkView model =
         E.column [ E.width E.fill, E.padding 10, E.spacing 20 ]
             [ header
             , Input.text textInputStyle
-                { text = justOrEmptyString model.title
+                { text = link.description
                 , label =
                     Input.labelAbove labelStyle <| E.text "Title"
                 , placeholder = Nothing
@@ -337,7 +440,7 @@ saveLinkView model =
                 }
             , Input.text
                 textInputStyle
-                { text = justOrEmptyString model.url
+                { text = link.url
                 , label =
                     Input.labelAbove labelStyle <| E.text "Url"
                 , placeholder = Nothing
@@ -350,14 +453,14 @@ saveLinkView model =
                     ++ textInputStyle
                 )
                 { onChange = UpdateNote
-                , text = justOrEmptyString model.note
+                , text = Maybe.withDefault "" link.extended
                 , placeholder = Nothing
                 , label = Input.labelAbove labelStyle <| E.text "Notes"
                 , spellcheck = True
                 }
             , Input.text
                 textInputStyle
-                { text = justOrEmptyString model.tags
+                { text = Maybe.withDefault "" link.tags
                 , label =
                     Input.labelAbove labelStyle <| E.text "Tags"
                 , placeholder = Nothing
@@ -398,41 +501,41 @@ successView =
 
 {-| The view if there was an error
 -}
-failureView : String -> Html.Html Msg
-failureView errorMsg =
+showMessageView : String -> List (E.Attribute Msg) -> Html.Html Msg
+showMessageView msg extraAttributes =
     layout <|
         E.column [ E.width E.fill, E.padding 10 ]
             [ header
             , E.el
-                [ Region.heading 1
-                , E.centerX
-                , E.centerY
-                , E.paddingXY 0 30
-                , Font.extraBold
-                , Font.size 20
-                , Font.color <| E.rgb255 255 0 0
-                ]
+                ([ Region.heading 1
+                 , E.centerX
+                 , E.centerY
+                 , E.paddingXY 0 30
+                 , Font.extraBold
+                 , Font.size 20
+                 ]
+                    ++ extraAttributes
+                )
               <|
                 E.text <|
-                    "An error occured t__t"
-                        ++ errorMsg
+                    msg
             ]
 
 
 view : Model -> Html.Html Msg
-view ({ currentPage } as model) =
-    case currentPage of
-        SaveLinkPage ->
-            saveLinkView model
-
-        AuthorizePage ->
+view model =
+    case model of
+        Unauthorized ->
             authorizeView
+
+        SavePage _ link ->
+            saveLinkView link
 
         SaveSuccess ->
             successView
 
-        SaveFailure e ->
-            failureView e
+        ShowError m ->
+            showMessageView m [ Font.color <| E.rgb255 255 0 0 ]
 
 
 
@@ -458,14 +561,17 @@ main =
 messageToJs : SendMessage -> Cmd msg
 messageToJs msg =
     case msg of
+        GetTabInfoMessage ->
+            sendMessage { action = "getTabInfo", data = Nothing }
+
         StartAuthorizationMessage ->
-            sendMessage { action = "auth", data = Json.Encode.null }
+            sendMessage { action = "auth", data = Nothing }
 
         LinkSavedMessage ->
-            sendMessage { action = "success", data = Json.Encode.null }
+            sendMessage { action = "success", data = Nothing }
 
 
 port sendMessage : JSMessage -> Cmd msg
 
 
-port messageReceiver : (ReceivedMessage -> msg) -> Sub msg
+port messageReceiver : (JSMessage -> msg) -> Sub msg
