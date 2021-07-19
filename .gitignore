@@ -5,3 +5,4 @@ dist
 elm_stuff
 web-ext-artifacts
 extension/popup/elm.js
+.web-extension-id

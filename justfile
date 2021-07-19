@@ -10,7 +10,7 @@ lint:
 
 # Sign the extension
 sign: build
-    @npx web-ext -s extension -o sign --api-key=$AMO_JWT_ISSUER --api-secret=$AMO_JWT_SECRET
+    @npx web-ext -s extension sign --api-key=$AMO_JWT_ISSUER --api-secret=$AMO_JWT_SECRET
 
 # Package the extension and load a temporary Firefox instance with the extension
 debug: elm-popup
