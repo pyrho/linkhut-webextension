@@ -12,5 +12,9 @@
   "devDependencies": {
     "elm-review": "^2.5.3",
     "web-ext": "^6.2.0"
+  },
+  "dependencies": {
+    "concurrently": "^6.2.0",
+    "elm-json": "^0.2.10"
   }
 }

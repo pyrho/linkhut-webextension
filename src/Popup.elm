@@ -304,7 +304,7 @@ update msg model =
                     in
                     ( ShowError <| "There was an error with the request" ++ errString, Cmd.none )
 
-        ( _, _ ) ->
+        _ ->
             ( ShowError "Unexpected state at update", Cmd.none )
 
 
@@ -323,7 +323,7 @@ postLink token { url, description, extended, tags, dt, replace, shared } =
         mandatoryParameters =
             [ ( "description", description )
             , ( "url", url )
-            -- , ( "replace", boolToApiString replace )
+            , ( "replace", boolToApiString replace )
             , ( "shared", boolToApiString shared )
             ]
 
