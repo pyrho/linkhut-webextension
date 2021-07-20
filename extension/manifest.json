@@ -3,7 +3,7 @@
   "manifest_version": 2,
   "name": "Linkhut Companion",
   "description": "Save bookmarks to linkhut",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "homepage_url": "https://git.sr.ht/~pyrho/linkhut-webextension",
   "icons": {
     "48": "icons/icon.svg"
