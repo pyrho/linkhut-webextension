@@ -8,7 +8,7 @@ of linkhut.
 
 isDebug : Bool
 isDebug =
-    True
+    False
 
 
 apiBaseUrl : String
