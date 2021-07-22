@@ -16,6 +16,7 @@ import Http
 import Json.Decode as D
 import Json.Encode
 import Url.Builder as B
+import Colors exposing (yellow, darkerYellow, black)
 
 
 
@@ -43,19 +44,19 @@ createButton label msg =
 -- CONSTANTS
 
 
-yellow : E.Color
-yellow =
-    E.rgb255 255 215 0
+-- yellow : E.Color
+-- yellow =
+--     E.rgb255 255 215 0
 
 
-darkerYellow : E.Color
-darkerYellow =
-    E.rgb255 122 104 0
+-- darkerYellow : E.Color
+-- darkerYellow =
+--     E.rgb255 122 104 0
 
 
-black : E.Color
-black =
-    E.rgb255 0 0 0
+-- black : E.Color
+-- black =
+--     E.rgb255 0 0 0
 
 
 
