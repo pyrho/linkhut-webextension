@@ -5183,6 +5183,10 @@ var $elm$core$Task$perform = F2(
 	});
 var $elm$browser$Browser$element = _Browser_element;
 var $elm$json$Json$Decode$field = _Json_decodeField;
+var $author$project$Options$defaultApiUrl = 'https://api.ln.ht/';
+var $author$project$Options$defaultClientId = '90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780';
+var $author$project$Options$defaultClientSecret = '62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8';
+var $author$project$Options$defaultWebUrl = 'https://ln.ht/';
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
 var $elm$core$Maybe$withDefault = F2(
@@ -5197,10 +5201,14 @@ var $elm$core$Maybe$withDefault = F2(
 var $author$project$Options$init = function (_v0) {
 	var webUrl = _v0.webUrl;
 	var apiUrl = _v0.apiUrl;
+	var clientId = _v0.clientId;
+	var clientSecret = _v0.clientSecret;
 	return _Utils_Tuple2(
 		{
-			apiUrl: A2($elm$core$Maybe$withDefault, 'https://api.ln.ht/', apiUrl),
-			webUrl: A2($elm$core$Maybe$withDefault, 'https://ln.ht/', webUrl)
+			apiUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultApiUrl, apiUrl),
+			clientId: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultClientId, clientId),
+			clientSecret: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultClientSecret, clientSecret),
+			webUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultWebUrl, webUrl)
 		},
 		$elm$core$Platform$Cmd$none);
 };
@@ -5214,7 +5222,9 @@ var $author$project$Options$messageReceiver = _Platform_incomingPort('messageRec
 var $author$project$Options$subscriptions = function (_v0) {
 	return $author$project$Options$messageReceiver($author$project$Options$Recv);
 };
+var $author$project$Options$ResetToJs = {$: 'ResetToJs'};
 var $author$project$Options$SaveToJs = {$: 'SaveToJs'};
+var $elm$json$Json$Encode$null = _Json_encodeNull;
 var $elm$json$Json$Encode$object = function (pairs) {
 	return _Json_wrap(
 		A3(
@@ -5237,7 +5247,6 @@ var $elm$core$Maybe$destruct = F3(
 			return _default;
 		}
 	});
-var $elm$json$Json$Encode$null = _Json_encodeNull;
 var $elm$json$Json$Encode$string = _Json_wrap;
 var $author$project$Options$sendMessage = _Platform_outgoingPort(
 	'sendMessage',
@@ -5257,21 +5266,35 @@ var $author$project$Options$sendMessage = _Platform_outgoingPort(
 	});
 var $author$project$Options$messageToJs = F2(
 	function (msg, model) {
-		var data = $elm$json$Json$Encode$object(
-			_List_fromArray(
-				[
-					_Utils_Tuple2(
-					'webUrl',
-					$elm$json$Json$Encode$string(model.webUrl)),
-					_Utils_Tuple2(
-					'apiUrl',
-					$elm$json$Json$Encode$string(model.apiUrl))
-				]));
-		return $author$project$Options$sendMessage(
-			{
-				action: 'save',
-				data: $elm$core$Maybe$Just(data)
-			});
+		if (msg.$ === 'ResetToJs') {
+			return $author$project$Options$sendMessage(
+				{
+					action: 'reset',
+					data: $elm$core$Maybe$Just($elm$json$Json$Encode$null)
+				});
+		} else {
+			var data = $elm$json$Json$Encode$object(
+				_List_fromArray(
+					[
+						_Utils_Tuple2(
+						'webUrl',
+						$elm$json$Json$Encode$string(model.webUrl)),
+						_Utils_Tuple2(
+						'apiUrl',
+						$elm$json$Json$Encode$string(model.apiUrl)),
+						_Utils_Tuple2(
+						'clientId',
+						$elm$json$Json$Encode$string(model.clientId)),
+						_Utils_Tuple2(
+						'clientSecret',
+						$elm$json$Json$Encode$string(model.clientSecret))
+					]));
+			return $author$project$Options$sendMessage(
+				{
+					action: 'save',
+					data: $elm$core$Maybe$Just(data)
+				});
+		}
 	});
 var $author$project$Options$update = F2(
 	function (msg, model) {
@@ -5294,17 +5317,58 @@ var $author$project$Options$update = F2(
 				return _Utils_Tuple2(
 					model,
 					A2($author$project$Options$messageToJs, $author$project$Options$SaveToJs, model));
+			case 'Reset':
+				return _Utils_Tuple2(
+					model,
+					A2($author$project$Options$messageToJs, $author$project$Options$ResetToJs, model));
+			case 'Recv':
+				var message = msg.a;
+				if (message === 'resetDone') {
+					return _Utils_Tuple2(
+						{apiUrl: $author$project$Options$defaultApiUrl, clientId: $author$project$Options$defaultClientId, clientSecret: $author$project$Options$defaultClientSecret, webUrl: $author$project$Options$defaultWebUrl},
+						$elm$core$Platform$Cmd$none);
+				} else {
+					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				}
+			case 'ClientIdUpdated':
+				var newId = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{clientId: newId}),
+					$elm$core$Platform$Cmd$none);
 			default:
-				return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
+				var newSecret = msg.a;
+				return _Utils_Tuple2(
+					_Utils_update(
+						model,
+						{clientSecret: newSecret}),
+					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Options$ApiUrlUpdated = function (a) {
 	return {$: 'ApiUrlUpdated', a: a};
 };
+var $author$project$Options$ClientIdUpdated = function (a) {
+	return {$: 'ClientIdUpdated', a: a};
+};
+var $author$project$Options$ClientSecretUpdated = function (a) {
+	return {$: 'ClientSecretUpdated', a: a};
+};
+var $author$project$Options$Reset = {$: 'Reset'};
 var $author$project$Options$Save = {$: 'Save'};
 var $author$project$Options$WebUrlUpdated = function (a) {
 	return {$: 'WebUrlUpdated', a: a};
 };
+var $mdgriffith$elm_ui$Internal$Model$Rgba = F4(
+	function (a, b, c, d) {
+		return {$: 'Rgba', a: a, b: b, c: c, d: d};
+	});
+var $mdgriffith$elm_ui$Element$rgb255 = F3(
+	function (red, green, blue) {
+		return A4($mdgriffith$elm_ui$Internal$Model$Rgba, red / 255, green / 255, blue / 255, 1);
+	});
+var $author$project$Colors$black = A3($mdgriffith$elm_ui$Element$rgb255, 0, 0, 0);
 var $mdgriffith$elm_ui$Internal$Model$Attr = function (a) {
 	return {$: 'Attr', a: a};
 };
@@ -11130,14 +11194,6 @@ var $mdgriffith$elm_ui$Element$column = F2(
 						attrs))),
 			$mdgriffith$elm_ui$Internal$Model$Unkeyed(children));
 	});
-var $mdgriffith$elm_ui$Internal$Model$Rgba = F4(
-	function (a, b, c, d) {
-		return {$: 'Rgba', a: a, b: b, c: c, d: d};
-	});
-var $mdgriffith$elm_ui$Element$rgb255 = F3(
-	function (red, green, blue) {
-		return A4($mdgriffith$elm_ui$Internal$Model$Rgba, red / 255, green / 255, blue / 255, 1);
-	});
 var $author$project$Colors$darkerYellow = A3($mdgriffith$elm_ui$Element$rgb255, 122, 104, 0);
 var $mdgriffith$elm_ui$Internal$Model$Fill = function (a) {
 	return {$: 'Fill', a: a};
@@ -12442,6 +12498,24 @@ var $mdgriffith$elm_ui$Element$layoutWith = F3(
 	});
 var $mdgriffith$elm_ui$Element$layout = $mdgriffith$elm_ui$Element$layoutWith(
 	{options: _List_Nil});
+var $mdgriffith$elm_ui$Element$row = F2(
+	function (attrs, children) {
+		return A4(
+			$mdgriffith$elm_ui$Internal$Model$element,
+			$mdgriffith$elm_ui$Internal$Model$asRow,
+			$mdgriffith$elm_ui$Internal$Model$div,
+			A2(
+				$elm$core$List$cons,
+				$mdgriffith$elm_ui$Internal$Model$htmlClass($mdgriffith$elm_ui$Internal$Style$classes.contentLeft + (' ' + $mdgriffith$elm_ui$Internal$Style$classes.contentCenterY)),
+				A2(
+					$elm$core$List$cons,
+					$mdgriffith$elm_ui$Element$width($mdgriffith$elm_ui$Element$shrink),
+					A2(
+						$elm$core$List$cons,
+						$mdgriffith$elm_ui$Element$height($mdgriffith$elm_ui$Element$shrink),
+						attrs))),
+			$mdgriffith$elm_ui$Internal$Model$Unkeyed(children));
+	});
 var $mdgriffith$elm_ui$Element$Border$widthXY = F2(
 	function (x, y) {
 		return A2(
@@ -12489,22 +12563,50 @@ var $author$project$Options$view = function (model) {
 				[
 					A3($author$project$Options$inputField, model.webUrl, 'Web URL', $author$project$Options$WebUrlUpdated),
 					A3($author$project$Options$inputField, model.apiUrl, 'API URL', $author$project$Options$ApiUrlUpdated),
+					A3($author$project$Options$inputField, model.clientId, 'Oauth Client ID', $author$project$Options$ClientIdUpdated),
+					A3($author$project$Options$inputField, model.clientSecret, 'Oauth Client Secret', $author$project$Options$ClientSecretUpdated),
 					A2(
-					$mdgriffith$elm_ui$Element$Input$button,
+					$mdgriffith$elm_ui$Element$row,
 					_List_fromArray(
 						[
-							$mdgriffith$elm_ui$Element$Background$color($author$project$Colors$yellow),
-							$mdgriffith$elm_ui$Element$Border$color($author$project$Colors$darkerYellow),
-							$mdgriffith$elm_ui$Element$Border$widthEach(
-							{bottom: 3, left: 0, right: 3, top: 0}),
-							$mdgriffith$elm_ui$Element$padding(10),
-							$mdgriffith$elm_ui$Element$Border$rounded(3),
-							$mdgriffith$elm_ui$Element$centerX
+							$mdgriffith$elm_ui$Element$centerX,
+							$mdgriffith$elm_ui$Element$spacing(50)
 						]),
-					{
-						label: $mdgriffith$elm_ui$Element$text('Save'),
-						onPress: $elm$core$Maybe$Just($author$project$Options$Save)
-					})
+					_List_fromArray(
+						[
+							A2(
+							$mdgriffith$elm_ui$Element$Input$button,
+							_List_fromArray(
+								[
+									$mdgriffith$elm_ui$Element$Background$color($author$project$Colors$yellow),
+									$mdgriffith$elm_ui$Element$Border$color($author$project$Colors$darkerYellow),
+									$mdgriffith$elm_ui$Element$Border$widthEach(
+									{bottom: 3, left: 0, right: 3, top: 0}),
+									$mdgriffith$elm_ui$Element$padding(10),
+									$mdgriffith$elm_ui$Element$Border$rounded(3),
+									$mdgriffith$elm_ui$Element$centerX
+								]),
+							{
+								label: $mdgriffith$elm_ui$Element$text('Save'),
+								onPress: $elm$core$Maybe$Just($author$project$Options$Save)
+							}),
+							A2(
+							$mdgriffith$elm_ui$Element$Input$button,
+							_List_fromArray(
+								[
+									$mdgriffith$elm_ui$Element$Background$color($author$project$Colors$darkerYellow),
+									$mdgriffith$elm_ui$Element$Border$color($author$project$Colors$black),
+									$mdgriffith$elm_ui$Element$Border$widthEach(
+									{bottom: 3, left: 0, right: 3, top: 0}),
+									$mdgriffith$elm_ui$Element$padding(10),
+									$mdgriffith$elm_ui$Element$Border$rounded(3),
+									$mdgriffith$elm_ui$Element$centerX
+								]),
+							{
+								label: $mdgriffith$elm_ui$Element$text('Reset'),
+								onPress: $elm$core$Maybe$Just($author$project$Options$Reset)
+							})
+						]))
 				])));
 };
 var $author$project$Options$main = $elm$browser$Browser$element(
@@ -12515,13 +12617,39 @@ _Platform_export({'Options':{'init':$author$project$Options$main(
 		function (webUrl) {
 			return A2(
 				$elm$json$Json$Decode$andThen,
-				function (apiUrl) {
-					return $elm$json$Json$Decode$succeed(
-						{apiUrl: apiUrl, webUrl: webUrl});
+				function (clientSecret) {
+					return A2(
+						$elm$json$Json$Decode$andThen,
+						function (clientId) {
+							return A2(
+								$elm$json$Json$Decode$andThen,
+								function (apiUrl) {
+									return $elm$json$Json$Decode$succeed(
+										{apiUrl: apiUrl, clientId: clientId, clientSecret: clientSecret, webUrl: webUrl});
+								},
+								A2(
+									$elm$json$Json$Decode$field,
+									'apiUrl',
+									$elm$json$Json$Decode$oneOf(
+										_List_fromArray(
+											[
+												$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
+												A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, $elm$json$Json$Decode$string)
+											]))));
+						},
+						A2(
+							$elm$json$Json$Decode$field,
+							'clientId',
+							$elm$json$Json$Decode$oneOf(
+								_List_fromArray(
+									[
+										$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
+										A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, $elm$json$Json$Decode$string)
+									]))));
 				},
 				A2(
 					$elm$json$Json$Decode$field,
-					'apiUrl',
+					'clientSecret',
 					$elm$json$Json$Decode$oneOf(
 						_List_fromArray(
 							[

@@ -3,14 +3,37 @@ port module Options exposing (main)
 -- import Json.Decode as D
 
 import Browser
-import Colors exposing (darkerYellow, yellow)
-import Element exposing (Element, alignRight, centerX, centerY, column, el, fill, padding, rgb255, spacing, text, width)
+import Colors exposing (black, darkerYellow, yellow)
+import Element exposing (Element, alignRight, centerX, centerY, column, el, fill, padding, rgb255, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border exposing (rounded)
-import Element.Font as Font
 import Element.Input as Input
 import Html
 import Json.Encode
+
+
+
+-- CONSTANTS
+
+
+defaultWebUrl : String
+defaultWebUrl =
+    "https://ln.ht/"
+
+
+defaultApiUrl : String
+defaultApiUrl =
+    "https://api.ln.ht/"
+
+
+defaultClientId : String
+defaultClientId =
+    "90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780"
+
+
+defaultClientSecret : String
+defaultClientSecret =
+    "62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8"
 
 
 
@@ -19,6 +42,7 @@ import Json.Encode
 
 type SendMessage
     = SaveToJs
+    | ResetToJs
 
 
 type alias JSMessage =
@@ -29,20 +53,27 @@ type alias JSMessage =
 
 type Msg
     = Save
+    | Reset
     | WebUrlUpdated String
     | ApiUrlUpdated String
+    | ClientIdUpdated String
+    | ClientSecretUpdated String
     | Recv String
 
 
 type alias Flags =
     { webUrl : Maybe String
     , apiUrl : Maybe String
+    , clientId : Maybe String
+    , clientSecret : Maybe String
     }
 
 
 type alias Model =
     { webUrl : String
     , apiUrl : String
+    , clientId : String
+    , clientSecret : String
     }
 
 
@@ -51,9 +82,11 @@ type alias Model =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { webUrl, apiUrl } =
-    ( { webUrl = Maybe.withDefault "https://ln.ht/" webUrl
-      , apiUrl = Maybe.withDefault "https://api.ln.ht/" apiUrl
+init { webUrl, apiUrl, clientId, clientSecret } =
+    ( { webUrl = Maybe.withDefault defaultWebUrl webUrl
+      , apiUrl = Maybe.withDefault defaultApiUrl apiUrl
+      , clientId = Maybe.withDefault defaultClientId clientId
+      , clientSecret = Maybe.withDefault defaultClientSecret clientSecret
       }
     , Cmd.none
     )
@@ -61,17 +94,6 @@ init { webUrl, apiUrl } =
 
 
 -- VIEW
-
-
-myElement : Element msg
-myElement =
-    el
-        [ Background.color (rgb255 240 0 245)
-        , Font.color (rgb255 255 255 255)
-        , rounded 3
-        , padding 3
-        ]
-        (text "stylishn")
 
 
 inputField : String -> String -> (String -> Msg) -> Element Msg
@@ -94,17 +116,32 @@ view model =
             [ width fill, centerY, centerX, spacing 10 ]
             [ inputField model.webUrl "Web URL" WebUrlUpdated
             , inputField model.apiUrl "API URL" ApiUrlUpdated
-            , Input.button
-                [ Background.color <| yellow
-                , Border.color darkerYellow
-                , Border.widthEach { bottom = 3, top = 0, right = 3, left = 0 }
-                , padding 10
-                , Border.rounded 3
-                , centerX
+            , inputField model.clientId "Oauth Client ID" ClientIdUpdated
+            , inputField model.clientSecret "Oauth Client Secret" ClientSecretUpdated
+            , row [ centerX, spacing 50 ]
+                [ Input.button
+                    [ Background.color <| yellow
+                    , Border.color darkerYellow
+                    , Border.widthEach { bottom = 3, top = 0, right = 3, left = 0 }
+                    , padding 10
+                    , Border.rounded 3
+                    , centerX
 
-                -- , E.mouseOver [ Background.color darkerYellow ]
+                    -- , E.mouseOver [ Background.color darkerYellow ]
+                    ]
+                    { onPress = Just Save, label = text "Save" }
+                , Input.button
+                    [ Background.color <| darkerYellow
+                    , Border.color black
+                    , Border.widthEach { bottom = 3, top = 0, right = 3, left = 0 }
+                    , padding 10
+                    , Border.rounded 3
+                    , centerX
+
+                    -- , E.mouseOver [ Background.color darkerYellow ]
+                    ]
+                    { onPress = Just Reset, label = text "Reset" }
                 ]
-                { onPress = Just Save, label = text "Save" }
             ]
 
 
@@ -124,8 +161,28 @@ update msg model =
         Save ->
             ( model, messageToJs SaveToJs model )
 
-        _ ->
-            ( model, Cmd.none )
+        Reset ->
+            ( model, messageToJs ResetToJs model )
+
+        Recv message ->
+            case message of
+                "resetDone" ->
+                    ( { webUrl = defaultWebUrl
+                      , apiUrl = defaultApiUrl
+                      , clientId = defaultClientId
+                      , clientSecret = defaultClientSecret
+                      }
+                    , Cmd.none
+                    )
+
+                _ ->
+                    ( model, Cmd.none )
+
+        ClientIdUpdated newId ->
+            ( { model | clientId = newId }, Cmd.none )
+
+        ClientSecretUpdated newSecret ->
+            ( { model | clientSecret = newSecret }, Cmd.none )
 
 
 
@@ -154,12 +211,17 @@ main =
 messageToJs : SendMessage -> Model -> Cmd msg
 messageToJs msg model =
     case msg of
+        ResetToJs ->
+            sendMessage { action = "reset", data = Just Json.Encode.null }
+
         SaveToJs ->
             let
                 data =
                     Json.Encode.object
                         [ ( "webUrl", Json.Encode.string model.webUrl )
                         , ( "apiUrl", Json.Encode.string model.apiUrl )
+                        , ( "clientId", Json.Encode.string model.clientId )
+                        , ( "clientSecret", Json.Encode.string model.clientSecret )
                         ]
             in
             sendMessage { action = "save", data = Just <| data }

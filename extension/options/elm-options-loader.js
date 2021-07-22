@@ -1,29 +1,34 @@
 (async function elmbootstrap() {
-    const webUrl = await browser.storage.local.get("webUrl");
-    const apiUrl = await browser.storage.local.get("apiUrl");
+    const settings =
+        (await browser.storage.local.get("settings"))?.settings ?? {};
 
     var app = Elm.Options.init({
         node: document.getElementById("elm"),
         flags: {
-            webUrl: webUrl?.webUrl ?? null,
-            apiUrl: apiUrl?.apiUrl ?? null,
+            clientId: settings?.clientId ?? null,
+            clientSecret: settings?.clientSecret ?? null,
+            webUrl: settings?.webUrl ?? null,
+            apiUrl: settings?.apiUrl ?? null,
         },
     });
 
     app.ports.sendMessage.subscribe(async payload => {
-        console.log("IN HERE!" + JSON.stringify(payload));
-        console.log(payload.action);
         // The popup has succesfully saved the link
         // Now close the popup
         if (payload.action === "save") {
-            console.log("saving");
             await browser.storage.local.set({
-                webUrl: payload.data.webUrl,
-                apiUrl: payload.data.apiUrl,
+                settings: {
+                    webUrl: payload.data.webUrl,
+                    apiUrl: payload.data.apiUrl,
+                    clientId: payload.data.clientId,
+                    clientSecret: payload.data.clientSecret,
+                },
             });
-            console.log("saved");
 
             app.ports.messageReceiver.send("success");
+        } else if (payload.action === "reset") {
+            await browser.storage.local.remove("settings");
+            app.ports.messageReceiver.send("resetDone");
         }
     });
 

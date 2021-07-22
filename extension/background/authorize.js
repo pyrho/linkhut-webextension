@@ -1,9 +1,10 @@
 import logger from "/background/logger.js";
 
-const BASE_URL_WEB = "https://ln.ht";
-const BASE_URL_API = "https://api.ln.ht";
-/* const BASE_URL_WEB = "http://10-25-47-4.sslip.io:4000";
-const BASE_URL_API = "http://10-25-47-4.sslip.io:4000/_"; */
+const settings = (await browser.storage.local.get("settings"))?.settings ?? {};
+
+const BASE_URL_WEB = settings?.webUrl ?? "https://ln.ht";
+
+const BASE_URL_API = settings?.apiUrl ?? "https://api.ln.ht";
 
 const CONSTANTS = {
     tokenUrl: `${BASE_URL_API}/v1/oauth/token`,
@@ -18,12 +19,12 @@ const REDIRECT_URL = (() => {
 // a way around it.
 // See https://github.com/danschultzer/ex_oauth2_provider#authorization-code-flow-in-a-single-page-application
 const CLIENT_SECRET =
-    // "383e94397d32a0904dd9e0cdc119a1c8d71ba563843e6cb7d12f9115889f87c0"; // LOCAL
-    "62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8"; // REAL
+    settings?.clientSecret ??
+    "62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8";
 
 const CLIENT_ID =
-    // "307ea23c4644a567256d7ea8f2dc6ee5708c3907d4729eb8e4ab001580b69334"; // LOCAL
-    "90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780"; // REAL
+    settings?.clientId ??
+    "90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780";
 
 const SCOPES = ["posts:write", "posts:read"];
 const AUTH_URL = `${CONSTANTS.authorizeUrl}\

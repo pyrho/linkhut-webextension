@@ -4,7 +4,7 @@ port module Popup exposing (main)
 -}
 
 import Browser
-import Config
+import Colors exposing (black, darkerYellow, yellow)
 import Element as E
 import Element.Background as Background
 import Element.Border as Border
@@ -16,7 +16,6 @@ import Http
 import Json.Decode as D
 import Json.Encode
 import Url.Builder as B
-import Colors exposing (yellow, darkerYellow, black)
 
 
 
@@ -42,30 +41,25 @@ createButton label msg =
 
 
 -- CONSTANTS
-
-
 -- yellow : E.Color
 -- yellow =
 --     E.rgb255 255 215 0
-
-
 -- darkerYellow : E.Color
 -- darkerYellow =
 --     E.rgb255 122 104 0
-
-
 -- black : E.Color
 -- black =
 --     E.rgb255 0 0 0
-
-
-
 -- MODEL
 
 
+type alias ApiUrl =
+    String
+
+
 type Model
-    = Unauthorized
-    | SavePage AccessToken Link
+    = Unauthorized ApiUrl
+    | SavePage AccessToken Link ApiUrl
     | ShowError String
     | SaveSuccess
 
@@ -126,7 +120,9 @@ newLink { title, url } =
         Nothing
         -- We default to "Replace:yes" because as of 2021-07-20 the API will
         -- return "something went wrong" if the link already exists
-        True
+        -- But the API will also reply with 404 if replace:yes and the link
+        -- does not exist yet.
+        False
         True
 
 
@@ -145,6 +141,7 @@ type alias Flags =
     { title : Maybe String
     , url : Maybe String
     , accessToken : Maybe String
+    , apiUrl : Maybe String
     }
 
 
@@ -153,13 +150,17 @@ type alias Flags =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { title, url, accessToken } =
+init { title, url, accessToken, apiUrl } =
+    let
+        apiUrl_ =
+            Maybe.withDefault "http://api.ln.ht" apiUrl
+    in
     case ( title, url, accessToken ) of
         ( Just title_, Just url_, Just accessToken_ ) ->
-            ( SavePage accessToken_ (newLink { title = title_, url = url_ }), Cmd.none )
+            ( SavePage accessToken_ (newLink { title = title_, url = url_ }) apiUrl_, Cmd.none )
 
         ( _, _, Nothing ) ->
-            ( Unauthorized, Cmd.none )
+            ( Unauthorized apiUrl_, Cmd.none )
 
         _ ->
             ( ShowError "Unexpected state at init", Cmd.none )
@@ -192,13 +193,12 @@ update msg model =
         ( StartAuthorization, _ ) ->
             ( model, messageToJs StartAuthorizationMessage )
 
-        ( Recv { action, data }, _ ) ->
+        -- After the user did "Authorize" and everything went well
+        ( Recv { action, data }, Unauthorized apiUrl ) ->
             case ( action, data ) of
-                -- After the user did "Authorize" but things turned to shit
                 ( "error", _ ) ->
                     ( ShowError "Error from JS land.", Cmd.none )
 
-                -- After the user did "Authorize" and everything went well
                 ( "authSuccess", _ ) ->
                     ( model, messageToJs GetTabInfoMessage )
 
@@ -212,7 +212,10 @@ update msg model =
                 ( "tabInfo", Just data_ ) ->
                     case D.decodeValue tabInfoDecoder data_ of
                         Ok v ->
-                            ( SavePage v.accessToken <| newLink { title = v.title, url = v.url }
+                            ( SavePage
+                                v.accessToken
+                                (newLink { title = v.title, url = v.url })
+                                apiUrl
                             , Cmd.none
                             )
 
@@ -227,50 +230,29 @@ update msg model =
                 _ ->
                     ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
 
-        {--
-            case action of
-                "authSuccess" ->
-                    ( model, messageToJs GetTabInfoMessage )
-
-                "tabInfo" ->
-                    case data of
-                        Just data_ ->
-                            case D.decodeValue tabInfoDecoder data_ of
-                                Ok v ->
-                                    ( SavePage v.accessToken <| newLink { title = v.title, url = v.url }
-                                    , Cmd.none
-                                    )
-
-                                Err e ->
-                                    ( ShowError <| "Failed to decode tabInfo: " ++ D.errorToString e
-                                    , Cmd.none
-                                    )
-
-                        Nothing ->
-                            ( ShowError <| "Unexpected message from JS " ++ action
-                            , Cmd.none
-                            )
-
-                "error" ->
-                    ( model, Cmd.none )
+        ( Recv { action, data }, _ ) ->
+            case ( action, data ) of
+                -- After the user did "Authorize" but things turned to shit
+                ( "error", _ ) ->
+                    ( ShowError "Error from JS land.", Cmd.none )
 
                 _ ->
                     ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
--}
-        ( UpdateUrl newUrl, SavePage token link ) ->
-            ( SavePage token { link | url = newUrl }, Cmd.none )
 
-        ( UpdateTitle newTitle, SavePage token link ) ->
-            ( SavePage token { link | description = newTitle }, Cmd.none )
+        ( UpdateUrl newUrl, SavePage token link apiUrl ) ->
+            ( SavePage token { link | url = newUrl } apiUrl, Cmd.none )
 
-        ( UpdateNote newNote, SavePage token link ) ->
-            ( SavePage token { link | extended = Just newNote }, Cmd.none )
+        ( UpdateTitle newTitle, SavePage token link apiUrl ) ->
+            ( SavePage token { link | description = newTitle } apiUrl, Cmd.none )
 
-        ( UpdateTags newTags, SavePage token link ) ->
-            ( SavePage token { link | tags = Just newTags }, Cmd.none )
+        ( UpdateNote newNote, SavePage token link apiUrl ) ->
+            ( SavePage token { link | extended = Just newNote } apiUrl, Cmd.none )
 
-        ( SendIt, SavePage token link ) ->
-            ( model, postLink token link )
+        ( UpdateTags newTags, SavePage token link apiUrl ) ->
+            ( SavePage token { link | tags = Just newTags } apiUrl, Cmd.none )
+
+        ( SendIt, SavePage token link apiUrl ) ->
+            ( model, postLink apiUrl token link )
 
         ( LinkAdded res, _ ) ->
             case res of
@@ -306,11 +288,18 @@ update msg model =
                     ( ShowError <| "There was an error with the request" ++ errString, Cmd.none )
 
         _ ->
+            let
+                _ =
+                    Debug.log "wtf" model
+
+                _ =
+                    Debug.log "wtf2" msg
+            in
             ( ShowError "Unexpected state at update", Cmd.none )
 
 
-postLink : AccessToken -> Link -> Cmd Msg
-postLink token { url, description, extended, tags, dt, replace, shared } =
+postLink : String -> AccessToken -> Link -> Cmd Msg
+postLink apiUrl token { url, description, extended, tags, dt, replace, shared } =
     let
         boolToApiString : Bool -> String
         boolToApiString b =
@@ -344,7 +333,7 @@ postLink token { url, description, extended, tags, dt, replace, shared } =
 
         builtUrl : String
         builtUrl =
-            B.crossOrigin Config.apiBaseUrl
+            B.crossOrigin apiUrl
                 [ "v1", "posts", "add" ]
                 queryParameters
 
@@ -355,7 +344,7 @@ postLink token { url, description, extended, tags, dt, replace, shared } =
             ]
     in
     Debug.log builtUrl
-    Http.request
+        Http.request
         { method = "GET"
         , headers = headers
         , url = builtUrl
@@ -526,10 +515,10 @@ showMessageView msg extraAttributes =
 view : Model -> Html.Html Msg
 view model =
     case model of
-        Unauthorized ->
+        Unauthorized _ ->
             authorizeView
 
-        SavePage _ link ->
+        SavePage _ link _ ->
             saveLinkView link
 
         SaveSuccess ->

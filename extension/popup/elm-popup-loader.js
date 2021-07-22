@@ -15,9 +15,11 @@
         return credentials?.access_token ?? null;
     }
 
+    const settings = (await browser.storage.local.get("settings"))?.settings;
     var app = Elm.Popup.init({
         node: document.getElementById("elm"),
         flags: {
+            apiUrl: settings?.apiUrl ?? null,
             accessToken: await getCredentials().then(getAccessToken),
             ...(await getTabInfo()),
         },

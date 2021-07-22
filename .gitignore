@@ -1,4 +1,5 @@
 node_modules
+README.local.md
 env
 elm-stuff
 dist
