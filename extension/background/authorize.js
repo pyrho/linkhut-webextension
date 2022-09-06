@@ -1,88 +1,121 @@
 import logger from "/background/logger.js";
 
-const settings = (await browser.storage.local.get("settings"))?.settings ?? {};
+async function getExtensionSettings() {
+  const s = await browser.storage.local.get("settings");
+  return s?.settings ?? {};
+}
 
-const BASE_URL_WEB = settings?.webUrl ?? "https://ln.ht";
+async function getBaseWebUrl() {
+  const settings = await getExtensionSettings();
+  return settings?.webUrl ?? "https://ln.ht";
+}
 
-const BASE_URL_API = settings?.apiUrl ?? "https://api.ln.ht";
+async function getBaseApiUrl() {
+  const settings = await getExtensionSettings();
+  return settings?.apiUrl ?? "https://api.ln.ht";
+}
 
-const CONSTANTS = {
-    tokenUrl: `${BASE_URL_API}/v1/oauth/token`,
-    authorizeUrl: `${BASE_URL_WEB}/_/oauth/authorize`,
-};
+async function getAuthorizeUrl() {
+  const baseWebUrl = await getBaseWebUrl();
+  return `${baseWebUrl}/_/oauth/authorize`;
+}
+
+async function getTokenUrl() {
+  const baseApiUrl = await getBaseApiUrl();
+  return `${baseApiUrl}/_/v1/oauth/token`;
+}
+
 const REDIRECT_URL = (() => {
-    const u = browser.identity.getRedirectURL();
-    return u.endsWith("/") ? u.slice(0, u.length - 1) : u;
+  const u = browser.identity.getRedirectURL();
+  return u.endsWith("/") ? u.slice(0, u.length - 1) : u;
 })();
 
 // I know this is a secret but with SPAs and extension there isn't really
 // a way around it.
 // See https://github.com/danschultzer/ex_oauth2_provider#authorization-code-flow-in-a-single-page-application
-const CLIENT_SECRET =
+async function getClientSecret() {
+  const settings = await getExtensionSettings();
+  return (
     settings?.clientSecret ??
-    "62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8";
+    "07af5586c4c7137b8c7fabd0a32ecd8a9f42c5cb0545f475e106e3e0e664d05e"
+  );
+}
 
-const CLIENT_ID =
+async function getClientId() {
+  const settings = await getExtensionSettings();
+  return (
     settings?.clientId ??
-    "90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780";
+    "de0a6c7c6d48fa0656207c81cdb361a218477c9449441f1b6157c28184e89556"
+  );
+}
 
 const SCOPES = ["posts:write", "posts:read"];
-const AUTH_URL = `${CONSTANTS.authorizeUrl}\
-?response_type=code\
-&client_id=${CLIENT_ID}\
-&redirect_uri=${encodeURIComponent(REDIRECT_URL)}\
-&scope=${encodeURIComponent(SCOPES.join(" "))}`;
+
+async function buildFullAuthorizationUrl() {
+  const baseUrl = await getAuthorizeUrl();
+  const clientId = await getClientId();
+  const fullAuthUrl = `${baseUrl}?response_type=code&client_id=${clientId}&redirect_uri=${encodeURIComponent(
+    REDIRECT_URL
+  )}&scope=${encodeURIComponent(SCOPES.join(" "))}`;
+  logger.debug(`Using auth url: ${fullAuthUrl}`);
+  return fullAuthUrl;
+}
 
 function getCodeFromCallbackUrl(redirectUri) {
-    logger.debug(`Redirect URI: ${redirectUri}`);
-    const parsedUrl = new URL(redirectUri);
+  logger.debug(`Redirect URI: ${redirectUri}`);
+  const parsedUrl = new URL(redirectUri);
 
-    if (parsedUrl.searchParams.has("error")) {
-        throw new Error(
-            parsedUrl.searchParams.get("error_description") ?? "Generic error",
-        );
-    }
+  if (parsedUrl.searchParams.has("error")) {
+    throw new Error(
+      parsedUrl.searchParams.get("error_description") ?? "Generic error"
+    );
+  }
 
-    if (!parsedUrl.searchParams.has("code")) {
-        throw new Error(
-            "Code was missing from the redirect URI as called by ln.ht",
-        );
-    }
-    return parsedUrl.searchParams.get("code");
+  if (!parsedUrl.searchParams.has("code")) {
+    throw new Error(
+      "Code was missing from the redirect URI as called by ln.ht"
+    );
+  }
+  return parsedUrl.searchParams.get("code");
 }
 
 async function getCredentialsFromGrantCode(redirectURL) {
-    const url = new URL(CONSTANTS.tokenUrl);
-    url.search = new URLSearchParams({
-        grant_type: "authorization_code",
-        client_id: CLIENT_ID,
-        redirect_uri: REDIRECT_URL,
-        client_secret: CLIENT_SECRET,
-        code: getCodeFromCallbackUrl(redirectURL),
-    }).toString();
+  const tokenUrl = await getTokenUrl();
+  const url = new URL(tokenUrl);
+  const clientSecret = await getClientSecret();
+  const clientId = await getClientId();
+  url.search = new URLSearchParams({
+    grant_type: "authorization_code",
+    client_id: clientId,
+    redirect_uri: REDIRECT_URL,
+    client_secret: clientSecret,
+    code: getCodeFromCallbackUrl(redirectURL),
+  }).toString();
 
-    function getTokensFromServerResponse(response) {
-        return new Promise((resolve, reject) => {
-            if (response.status !== 200) {
-                return reject(new Error("Token creation error"));
-            }
+  function getTokensFromServerResponse(response) {
+    return new Promise((resolve, reject) => {
+      if (response.status !== 200) {
+        return reject(
+          new Error(`Token creation error, status: ${response.status}`)
+        );
+      }
 
-            response.json().then(json => {
-                if (!json.access_token || !json.refresh_token) {
-                    return reject(
-                        new Error(
-                            `access_token or refresh_token was missing from server reply`,
-                        ),
-                    );
-                }
+      response.json().then((json) => {
+        if (!json.access_token || !json.refresh_token) {
+          return reject(
+            new Error(
+              `access_token or refresh_token was missing from server reply`
+            )
+          );
+        }
 
-                logger.debug("Token looks good");
-                return resolve(json);
-            });
-        });
-    }
+        logger.debug("Token looks good");
+        return resolve(json);
+      });
+    });
+  }
 
-    return fetch(url, { method: "POST" }).then(getTokensFromServerResponse);
+  return fetch(url, { method: "POST" }).then(getTokensFromServerResponse);
 }
 
 /**
@@ -90,20 +123,22 @@ Authenticate and authorize using browser.identity.launchWebAuthFlow().
 If successful, this resolves with a redirectURL string that contains
 an access token.
 */
-function authorize() {
-    return browser.identity.launchWebAuthFlow({
-        interactive: true,
-        url: AUTH_URL,
-    });
+async function authorize() {
+  const authUrl = await buildFullAuthorizationUrl();
+  logger.debug(`Starting authorize with url ${authUrl}`);
+  return browser.identity.launchWebAuthFlow({
+    interactive: true,
+    url: authUrl,
+  });
 }
 
 async function storeCredentials(credentials) {
-    logger.debug(
-        "Storing credentials in local storage" + JSON.stringify(credentials),
-    );
-    return browser.storage.local.set({ credentials });
+  logger.debug(
+    "Storing credentials in local storage" + JSON.stringify(credentials)
+  );
+  return browser.storage.local.set({ credentials });
 }
 
-export function getAccessToken() {
-    return authorize().then(getCredentialsFromGrantCode).then(storeCredentials);
+export async function getAccessToken() {
+  return authorize().then(getCredentialsFromGrantCode).then(storeCredentials);
 }
