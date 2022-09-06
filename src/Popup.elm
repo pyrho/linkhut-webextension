@@ -118,10 +118,12 @@ newLink { title, url } =
         Nothing
         Nothing
         Nothing
+
         -- We default to "Replace:yes" because as of 2021-07-20 the API will
         -- return "something went wrong" if the link already exists
         -- But the API will also reply with 404 if replace:yes and the link
         -- does not exist yet.
+        -- 2022-09-06 Still the case.
         False
         True
 
@@ -334,7 +336,7 @@ postLink apiUrl token { url, description, extended, tags, dt, replace, shared } 
         builtUrl : String
         builtUrl =
             B.crossOrigin apiUrl
-                [ "v1", "posts", "add" ]
+                [ "_", "v1", "posts", "add" ]
                 queryParameters
 
         headers =
