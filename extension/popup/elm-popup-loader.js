@@ -33,6 +33,8 @@
       setTimeout(() => window.close(), 1000);
       return;
     } else if (payload.action === "getTabInfo") {
+      // This occurs when the user has not authorized the extension yet.
+      // So the popup shows the OAuth flow first, then asks for the tab Info.
       app.ports.messageReceiver.send({
         action: "tabInfo",
         data: {

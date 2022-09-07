@@ -4,9 +4,9 @@ port module Options exposing (main)
 
 import Browser
 import Colors exposing (black, darkerYellow, yellow)
-import Element exposing (Element, alignRight, centerX, centerY, column, el, fill, padding, rgb255, row, spacing, text, width)
+import Element exposing (Element, centerX, centerY, column, el, fill, padding, rgb255, row, spacing, text, width)
 import Element.Background as Background
-import Element.Border as Border exposing (rounded)
+import Element.Border as Border
 import Element.Input as Input
 import Html
 import Json.Encode

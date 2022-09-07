@@ -1,6 +1,6 @@
 port module Popup exposing (main)
 
-{-| The module represents the contents of the extension popup.
+{-| The standalone Elm app represents the contents of the extension popup.
 -}
 
 import Browser
@@ -22,6 +22,80 @@ import Url.Builder as B
 -- UTILS
 
 
+existingLinkToLink : ExistingLink -> Link -> Link
+existingLinkToLink existingLink link =
+    { link
+        | description = existingLink.description
+        , extended = existingLink.extended
+        , replace = True
+        , tags =
+            if String.isEmpty existingLink.tags then
+                Nothing
+
+            else
+                Just existingLink.tags
+    }
+
+
+httpErrorHandler : Http.Error -> String
+httpErrorHandler httpError =
+    case httpError of
+        Http.BadUrl x ->
+            "BadUrl: " ++ x
+
+        Http.Timeout ->
+            "Timeout"
+
+        Http.NetworkError ->
+            "NetErr"
+
+        Http.BadStatus x ->
+            "BadStatus: " ++ String.fromInt x
+
+        Http.BadBody x ->
+            "BadBody: " ++ x
+
+
+linkDecoder : D.Decoder (List ExistingLink)
+linkDecoder =
+    D.field "posts"
+        (D.list
+            (D.map6 ExistingLink
+                (D.field "description" D.string)
+                (D.maybe (D.field "extended" D.string))
+                (D.field "hash" D.string)
+                (D.field "href" D.string)
+                (D.field "tags" D.string)
+                (D.field "time" D.string)
+            )
+        )
+
+
+{-| Fetches a given link from the API.
+
+    fetchLinkDataFromApi "https://ln.ht" "bearertoken" "https://api.ln.ht"
+
+-}
+fetchLinkDataFromApi : String -> String -> String -> Cmd Msg
+fetchLinkDataFromApi currentUrl token apiUrl =
+    Http.request
+        { method = "GET"
+        , headers =
+            [ Http.header "Accept" "application/json"
+            , Http.header "Content-Type" "application/json"
+            , Http.header "Authorization" <| "Bearer " ++ token
+            ]
+        , url =
+            B.crossOrigin apiUrl
+                [ "_", "v1", "posts", "get" ]
+                [ B.string "url" currentUrl ]
+        , body = Http.emptyBody
+        , timeout = Nothing
+        , tracker = Nothing
+        , expect = Http.expectJson GotLinkQueryResponse linkDecoder
+        }
+
+
 createButton : String -> Msg -> E.Element Msg
 createButton label msg =
     Input.button
@@ -31,8 +105,7 @@ createButton label msg =
         , E.padding 10
         , Border.rounded 3
         , E.centerX
-
-        -- , E.mouseOver [ Background.color darkerYellow ]
+        , E.mouseOver [ Background.color darkerYellow ]
         ]
         { onPress = Just msg
         , label = E.el [ E.centerX ] <| E.text label
@@ -57,9 +130,31 @@ type alias ApiUrl =
     String
 
 
+{-|
+
+    <post description="sourcehut - the hacker's forge"
+          extended="sourcehut is a network of useful open source tools for software project maintainers and collaborators, including git repos, bug tracking, continuous integration, and mailing lists."
+          hash="f76bae21f8ea04facdb544655745c924"
+          href="https://sourcehut.org/"
+          others="0"
+          tag="git oss software-forge"
+          time="2020-12-23T19:51:48Z"/>
+
+-}
+type alias ExistingLink =
+    { description : String
+    , extended : Maybe String
+    , hash : String
+    , href : String
+    , tags : String
+    , time : String
+    }
+
+
 type Model
     = Unauthorized ApiUrl
-    | SavePage AccessToken Link ApiUrl
+    | Authorized AccessToken Link ApiUrl
+    | SavePage AccessToken Link ApiUrl (Maybe String)
     | ShowError String
     | SaveSuccess
 
@@ -92,6 +187,8 @@ type Msg
     | UpdateTags String
     | SendIt
     | LinkAdded (Result Http.Error String)
+      -- Tho the list always has one element
+    | GotLinkQueryResponse (Result Http.Error (List ExistingLink))
 
 
 {-| Represents a link to be saved via the API
@@ -118,7 +215,6 @@ newLink { title, url } =
         Nothing
         Nothing
         Nothing
-
         -- We default to "Replace:yes" because as of 2021-07-20 the API will
         -- return "something went wrong" if the link already exists
         -- But the API will also reply with 404 if replace:yes and the link
@@ -159,7 +255,11 @@ init { title, url, accessToken, apiUrl } =
     in
     case ( title, url, accessToken ) of
         ( Just title_, Just url_, Just accessToken_ ) ->
-            ( SavePage accessToken_ (newLink { title = title_, url = url_ }) apiUrl_, Cmd.none )
+            let
+                linkToSave =
+                    newLink { title = title_, url = url_ }
+            in
+            ( Authorized accessToken_ linkToSave apiUrl_, fetchLinkDataFromApi linkToSave.url accessToken_ apiUrl_ )
 
         ( _, _, Nothing ) ->
             ( Unauthorized apiUrl_, Cmd.none )
@@ -218,6 +318,7 @@ update msg model =
                                 v.accessToken
                                 (newLink { title = v.title, url = v.url })
                                 apiUrl
+                                Nothing
                             , Cmd.none
                             )
 
@@ -241,20 +342,42 @@ update msg model =
                 _ ->
                     ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
 
-        ( UpdateUrl newUrl, SavePage token link apiUrl ) ->
-            ( SavePage token { link | url = newUrl } apiUrl, Cmd.none )
+        ( UpdateUrl newUrl, SavePage token link apiUrl savedDate ) ->
+            ( SavePage token { link | url = newUrl } apiUrl savedDate, Cmd.none )
 
-        ( UpdateTitle newTitle, SavePage token link apiUrl ) ->
-            ( SavePage token { link | description = newTitle } apiUrl, Cmd.none )
+        ( UpdateTitle newTitle, SavePage token link apiUrl savedDate ) ->
+            ( SavePage token { link | description = newTitle } apiUrl savedDate, Cmd.none )
 
-        ( UpdateNote newNote, SavePage token link apiUrl ) ->
-            ( SavePage token { link | extended = Just newNote } apiUrl, Cmd.none )
+        ( UpdateNote newNote, SavePage token link apiUrl savedDate ) ->
+            ( SavePage token { link | extended = Just newNote } apiUrl savedDate, Cmd.none )
 
-        ( UpdateTags newTags, SavePage token link apiUrl ) ->
-            ( SavePage token { link | tags = Just newTags } apiUrl, Cmd.none )
+        ( UpdateTags newTags, SavePage token link apiUrl savedDate ) ->
+            ( SavePage token { link | tags = Just newTags } apiUrl savedDate, Cmd.none )
 
-        ( SendIt, SavePage token link apiUrl ) ->
+        ( SendIt, SavePage token link apiUrl _ ) ->
             ( model, postLink apiUrl token link )
+
+        ( GotLinkQueryResponse res, Authorized token link apiUrl ) ->
+            case res of
+                Ok existingLinks ->
+                    case List.head existingLinks of
+                        Just existingLink ->
+                            ( SavePage token (existingLinkToLink existingLink link) apiUrl (Just existingLink.time), Cmd.none )
+
+                        -- ( ShowError <| "SUCCESS, api responded: " ++ link.description, Cmd.none )
+                        Nothing ->
+                            -- 2022-09-07: This should never happen because if the link does not exist the API returns 404
+                            -- If this starts occuring, then the API changed.
+                            ( ShowError <| "Error: Link not found, this should never happen.", Cmd.none )
+
+                Err httpError ->
+                    case httpError of
+                        -- This means the link was not found by the API, so it's a brand new link
+                        Http.BadStatus 404 ->
+                            ( SavePage token link apiUrl Nothing, Cmd.none )
+
+                        _ ->
+                            ( ShowError <| "Error getting link: " ++ httpErrorHandler httpError, Cmd.none )
 
         ( LinkAdded res, _ ) ->
             case res of
@@ -269,25 +392,7 @@ update msg model =
                             )
 
                 Err httpError ->
-                    let
-                        errString =
-                            case httpError of
-                                Http.BadUrl x ->
-                                    "BadUrl: " ++ x
-
-                                Http.Timeout ->
-                                    "Timeout"
-
-                                Http.NetworkError ->
-                                    "NetErr"
-
-                                Http.BadStatus x ->
-                                    "BadStatus: " ++ String.fromInt x
-
-                                Http.BadBody x ->
-                                    "BadBody: " ++ x
-                    in
-                    ( ShowError <| "There was an error with the request" ++ errString, Cmd.none )
+                    ( ShowError <| "There was an error with the request" ++ httpErrorHandler httpError, Cmd.none )
 
         _ ->
             let
@@ -407,8 +512,8 @@ layout =
 
 {-| The view element used to save links
 -}
-saveLinkView : Link -> Html.Html Msg
-saveLinkView link =
+saveLinkView : Link -> Maybe String -> Html.Html Msg
+saveLinkView link savedDateMaybe =
     let
         labelStyle =
             [ Font.extraBold
@@ -419,26 +524,37 @@ saveLinkView link =
         textInputStyle =
             [ Font.size 12
             ]
+
+        urlElement =
+            case savedDateMaybe of
+                Just _ ->
+                    E.textColumn [ E.spacing 10, E.width E.shrink]
+                    [ E.paragraph [] [ E.el labelStyle (E.text "Url") ]
+                    , E.paragraph [] [ E.el textInputStyle (E.text link.url)]
+                    ]
+
+                Nothing ->
+                    Input.text
+                        textInputStyle
+                        { text = link.url
+                        , label =
+                            Input.labelAbove labelStyle <| E.text "Url"
+                        , placeholder = Nothing
+                        , onChange = UpdateUrl
+                        }
     in
     layout <|
         E.column [ E.width E.fill, E.padding 10, E.spacing 20 ]
-            [ header
-            , Input.text textInputStyle
+            ([ header
+             , Input.text textInputStyle
                 { text = link.description
                 , label =
                     Input.labelAbove labelStyle <| E.text "Title"
                 , placeholder = Nothing
                 , onChange = UpdateTitle
                 }
-            , Input.text
-                textInputStyle
-                { text = link.url
-                , label =
-                    Input.labelAbove labelStyle <| E.text "Url"
-                , placeholder = Nothing
-                , onChange = UpdateUrl
-                }
-            , Input.multiline
+             , urlElement
+             , Input.multiline
                 ([ E.width <| E.maximum 450 E.fill
                  , E.height <| E.px 150
                  ]
@@ -450,7 +566,7 @@ saveLinkView link =
                 , label = Input.labelAbove labelStyle <| E.text "Notes"
                 , spellcheck = True
                 }
-            , Input.text
+             , Input.text
                 textInputStyle
                 { text = Maybe.withDefault "" link.tags
                 , label =
@@ -458,8 +574,18 @@ saveLinkView link =
                 , placeholder = Nothing
                 , onChange = UpdateTags
                 }
-            , createButton "Save" SendIt
-            ]
+             ]
+                ++ (case savedDateMaybe of
+                        Just savedDate ->
+                            [ E.el [ Font.italic, Font.size 10 ] <|
+                                E.text ("Previously saved: " ++ savedDate)
+                            , createButton "Update" SendIt
+                            ]
+
+                        Nothing ->
+                            [ createButton "Save" SendIt ]
+                   )
+            )
 
 
 {-| The view element when the user is not logged in yet
@@ -471,6 +597,21 @@ authorizeView =
             [ header
             , E.el [ E.centerX, E.centerY, E.paddingXY 0 30 ] <|
                 createButton "Authorize" StartAuthorization
+            ]
+
+
+loadingView : Html.Html Msg
+loadingView =
+    layout <|
+        E.column [ E.width E.fill, E.padding 10 ]
+            [ header
+            , E.el [ E.centerX, E.centerY, E.paddingXY 0 30 ] <|
+                E.image
+                    [ E.width <| E.px 80
+                    ]
+                    { src = "/icons/loading.svg"
+                    , description = "loading"
+                    }
             ]
 
 
@@ -486,7 +627,7 @@ successView =
                     [ E.width <| E.px 80
                     ]
                     { src = "/icons/success-green-check-mark.svg"
-                    , description = "logo"
+                    , description = "success"
                     }
             ]
 
@@ -517,11 +658,14 @@ showMessageView msg extraAttributes =
 view : Model -> Html.Html Msg
 view model =
     case model of
+        Authorized _ _ _ ->
+            loadingView
+
         Unauthorized _ ->
             authorizeView
 
-        SavePage _ link _ ->
-            saveLinkView link
+        SavePage _ link _ savedDateMaybe ->
+            saveLinkView link savedDateMaybe
 
         SaveSuccess ->
             successView
