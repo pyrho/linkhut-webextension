@@ -525,13 +525,25 @@ saveLinkView link savedDateMaybe =
             [ Font.size 12
             ]
 
+        titleElement =
+            Input.text
+                textInputStyle
+                { text = link.description
+                , label =
+                    Input.labelAbove labelStyle <| E.text "Title"
+                , placeholder = Nothing
+                , onChange = UpdateTitle
+                }
+
+        -- If a link has been previously submitted to ln.ht it cannot be edited (only deleted).
+        -- Hence in this case, the UI forbids editing the link
         urlElement =
             case savedDateMaybe of
                 Just _ ->
-                    E.textColumn [ E.spacing 10, E.width E.shrink]
-                    [ E.paragraph [] [ E.el labelStyle (E.text "Url") ]
-                    , E.paragraph [] [ E.el textInputStyle (E.text link.url)]
-                    ]
+                    E.textColumn [ E.spacing 10, E.width E.shrink ]
+                        [ E.paragraph [] [ E.el labelStyle (E.text "Url") ]
+                        , E.paragraph [] [ E.el textInputStyle (E.text link.url) ]
+                        ]
 
                 Nothing ->
                     Input.text
@@ -542,19 +554,9 @@ saveLinkView link savedDateMaybe =
                         , placeholder = Nothing
                         , onChange = UpdateUrl
                         }
-    in
-    layout <|
-        E.column [ E.width E.fill, E.padding 10, E.spacing 20 ]
-            ([ header
-             , Input.text textInputStyle
-                { text = link.description
-                , label =
-                    Input.labelAbove labelStyle <| E.text "Title"
-                , placeholder = Nothing
-                , onChange = UpdateTitle
-                }
-             , urlElement
-             , Input.multiline
+
+        notesElement =
+            Input.multiline
                 ([ E.width <| E.maximum 450 E.fill
                  , E.height <| E.px 150
                  ]
@@ -566,7 +568,9 @@ saveLinkView link savedDateMaybe =
                 , label = Input.labelAbove labelStyle <| E.text "Notes"
                 , spellcheck = True
                 }
-             , Input.text
+
+        tagsElement =
+            Input.text
                 textInputStyle
                 { text = Maybe.withDefault "" link.tags
                 , label =
@@ -574,18 +578,38 @@ saveLinkView link savedDateMaybe =
                 , placeholder = Nothing
                 , onChange = UpdateTags
                 }
-             ]
-                ++ (case savedDateMaybe of
-                        Just savedDate ->
-                            [ E.el [ Font.italic, Font.size 10 ] <|
-                                E.text ("Previously saved: " ++ savedDate)
-                            , createButton "Update" SendIt
-                            ]
 
-                        Nothing ->
-                            [ createButton "Save" SendIt ]
-                   )
-            )
+        -- If the link was previously saved, show the date; otherwise show nothing.
+        previouslySavedElement =
+            let
+                savedDateIntoHtmlText =
+                    Maybe.map
+                        (\savedDate -> E.el [ Font.italic, Font.size 10 ] <| E.text ("Previously saved: " ++ savedDate))
+                        savedDateMaybe
+            in
+            Maybe.withDefault E.none savedDateIntoHtmlText
+
+        submitBtn =
+            let
+                savedDateMaybeIntoText =
+                    Maybe.withDefault "Save" (Maybe.map (always "Update") savedDateMaybe)
+            in
+            createButton savedDateMaybeIntoText SendIt
+    in
+    layout <|
+        E.column
+            [ E.width E.fill
+            , E.padding 10
+            , E.spacing 20
+            ]
+            [ header
+            , titleElement
+            , urlElement
+            , notesElement
+            , tagsElement
+            , previouslySavedElement
+            , submitBtn
+            ]
 
 
 {-| The view element when the user is not logged in yet
