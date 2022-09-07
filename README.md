@@ -1,4 +1,4 @@
-# Linkhut Companion
+# Linkhut Companion (wip)
 
 A webextension for [linkhut](https://ln.ht).
 
