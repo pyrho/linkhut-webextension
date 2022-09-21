@@ -37,7 +37,7 @@ async function getClientSecret() {
   const settings = await getExtensionSettings();
   return (
     settings?.clientSecret ??
-    "07af5586c4c7137b8c7fabd0a32ecd8a9f42c5cb0545f475e106e3e0e664d05e"
+    "1fda7bfbaa775387caadb05dd7c6c93c1cf5d25100f767772a8fd3194f6b25ed"
   );
 }
 
@@ -45,7 +45,7 @@ async function getClientId() {
   const settings = await getExtensionSettings();
   return (
     settings?.clientId ??
-    "de0a6c7c6d48fa0656207c81cdb361a218477c9449441f1b6157c28184e89556"
+    "12ea1ba0aa4c3e0c59cbc235a17880e7a57a8cc4d3c7b7c1d76423e68b35fa8f"
   );
 }
 
