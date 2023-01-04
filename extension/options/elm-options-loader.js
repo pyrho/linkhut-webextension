@@ -5,8 +5,7 @@
   var app = Elm.Options.init({
     node: document.getElementById("elm"),
     flags: {
-      clientId: settings?.clientId ?? null,
-      clientSecret: settings?.clientSecret ?? null,
+      personalAccessToken: settings?.personalAccessToken ?? null,
       webUrl: settings?.webUrl ?? null,
       apiUrl: settings?.apiUrl ?? null,
     },
@@ -19,8 +18,7 @@
         settings: {
           webUrl: payload.data.webUrl,
           apiUrl: payload.data.apiUrl,
-          clientId: payload.data.clientId,
-          clientSecret: payload.data.clientSecret,
+          personalAccessToken: payload.data.personalAccessToken,
         },
       });
 

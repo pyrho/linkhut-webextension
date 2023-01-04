@@ -4,7 +4,7 @@ port module Options exposing (main)
 
 import Browser
 import Colors exposing (black, darkerYellow, yellow)
-import Element exposing (Element, centerX, centerY, column, el, fill, padding, rgb255, row, spacing, text, width)
+import Element exposing (Element, centerX, centerY, column, el, fill, padding, row, spacing, text, width)
 import Element.Background as Background
 import Element.Border as Border
 import Element.Input as Input
@@ -26,17 +26,6 @@ defaultApiUrl =
     "https://api.ln.ht/"
 
 
-defaultClientId : String
-defaultClientId =
-    "90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780"
-
-
-defaultClientSecret : String
-defaultClientSecret =
-    "62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8"
-
-
-
 -- TYPES
 
 
@@ -56,24 +45,21 @@ type Msg
     | Reset
     | WebUrlUpdated String
     | ApiUrlUpdated String
-    | ClientIdUpdated String
-    | ClientSecretUpdated String
+    | PersonalAccessTokenUpdated String
     | Recv String
 
 
 type alias Flags =
     { webUrl : Maybe String
     , apiUrl : Maybe String
-    , clientId : Maybe String
-    , clientSecret : Maybe String
+    , personalAccessToken : Maybe String
     }
 
 
 type alias Model =
     { webUrl : String
     , apiUrl : String
-    , clientId : String
-    , clientSecret : String
+    , personalAccessToken : String
     }
 
 
@@ -82,11 +68,10 @@ type alias Model =
 
 
 init : Flags -> ( Model, Cmd Msg )
-init { webUrl, apiUrl, clientId, clientSecret } =
+init { webUrl, apiUrl, personalAccessToken } =
     ( { webUrl = Maybe.withDefault defaultWebUrl webUrl
       , apiUrl = Maybe.withDefault defaultApiUrl apiUrl
-      , clientId = Maybe.withDefault defaultClientId clientId
-      , clientSecret = Maybe.withDefault defaultClientSecret clientSecret
+      , personalAccessToken = Maybe.withDefault "" personalAccessToken 
       }
     , Cmd.none
     )
@@ -116,8 +101,7 @@ view model =
             [ width fill, centerY, centerX, spacing 10 ]
             [ inputField model.webUrl "Web URL" WebUrlUpdated
             , inputField model.apiUrl "API URL" ApiUrlUpdated
-            , inputField model.clientId "Oauth Client ID" ClientIdUpdated
-            , inputField model.clientSecret "Oauth Client Secret" ClientSecretUpdated
+            , inputField model.personalAccessToken "Personal Access Token" PersonalAccessTokenUpdated 
             , row [ centerX, spacing 50 ]
                 [ Input.button
                     [ Background.color <| yellow
@@ -169,8 +153,7 @@ update msg model =
                 "resetDone" ->
                     ( { webUrl = defaultWebUrl
                       , apiUrl = defaultApiUrl
-                      , clientId = defaultClientId
-                      , clientSecret = defaultClientSecret
+                      , personalAccessToken = ""
                       }
                     , Cmd.none
                     )
@@ -178,12 +161,8 @@ update msg model =
                 _ ->
                     ( model, Cmd.none )
 
-        ClientIdUpdated newId ->
-            ( { model | clientId = newId }, Cmd.none )
-
-        ClientSecretUpdated newSecret ->
-            ( { model | clientSecret = newSecret }, Cmd.none )
-
+        PersonalAccessTokenUpdated newToken ->
+            ( { model | personalAccessToken = newToken }, Cmd.none )
 
 
 -- SUBSCRIPTIONS
@@ -220,8 +199,7 @@ messageToJs msg model =
                     Json.Encode.object
                         [ ( "webUrl", Json.Encode.string model.webUrl )
                         , ( "apiUrl", Json.Encode.string model.apiUrl )
-                        , ( "clientId", Json.Encode.string model.clientId )
-                        , ( "clientSecret", Json.Encode.string model.clientSecret )
+                        , ( "personalAccessToken", Json.Encode.string model.personalAccessToken )
                         ]
             in
             sendMessage { action = "save", data = Just <| data }

@@ -152,7 +152,8 @@ type alias ExistingLink =
 
 
 type Model
-    = Unauthorized ApiUrl
+    -- `Unauthorized` when the PersonalAccessToken is None
+    = Unauthorized
     | Authorized AccessToken Link ApiUrl
     | SavePage AccessToken Link ApiUrl (Maybe String)
     | ShowError String
@@ -160,9 +161,7 @@ type Model
 
 
 type SendMessage
-    = StartAuthorizationMessage
-    | LinkSavedMessage
-    | GetTabInfoMessage
+    = LinkSavedMessage
 
 
 type alias JSMessage =
@@ -174,13 +173,11 @@ type alias JSMessage =
 type alias JSMessageGetTabInfo =
     { url : String
     , title : String
-    , accessToken : String
     }
 
 
 type Msg
-    = StartAuthorization
-    | Recv JSMessage
+    = Recv JSMessage
     | UpdateUrl String
     | UpdateTitle String
     | UpdateNote String
@@ -262,7 +259,7 @@ init { title, url, accessToken, apiUrl } =
             ( Authorized accessToken_ linkToSave apiUrl_, fetchLinkDataFromApi linkToSave.url accessToken_ apiUrl_ )
 
         ( _, _, Nothing ) ->
-            ( Unauthorized apiUrl_, Cmd.none )
+            ( Unauthorized, Cmd.none )
 
         _ ->
             ( ShowError "Unexpected state at init", Cmd.none )
@@ -283,52 +280,20 @@ subscriptions _ =
 
 tabInfoDecoder : D.Decoder JSMessageGetTabInfo
 tabInfoDecoder =
-    D.map3 JSMessageGetTabInfo
+    D.map2 JSMessageGetTabInfo
         (D.field "url" D.string)
         (D.field "title" D.string)
-        (D.field "accessToken" D.string)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
 update msg model =
     case ( msg, model ) of
-        ( StartAuthorization, _ ) ->
-            ( model, messageToJs StartAuthorizationMessage )
 
         -- After the user did "Authorize" and everything went well
-        ( Recv { action, data }, Unauthorized apiUrl ) ->
+        ( Recv { action, data }, Unauthorized ) ->
             case ( action, data ) of
                 ( "error", _ ) ->
                     ( ShowError "Error from JS land.", Cmd.none )
-
-                ( "authSuccess", _ ) ->
-                    ( model, messageToJs GetTabInfoMessage )
-
-                -- After successful authorization, we explicitely ask the JS for the
-                -- updated data.
-                --
-                -- @NOTE
-                --  this data could be passed on directly via the `authSuccess`
-                --  message but I wanted to try out a more complex flow (:
-                --    - dr, 2021-07-20
-                ( "tabInfo", Just data_ ) ->
-                    case D.decodeValue tabInfoDecoder data_ of
-                        Ok v ->
-                            ( SavePage
-                                v.accessToken
-                                (newLink { title = v.title, url = v.url })
-                                apiUrl
-                                Nothing
-                            , Cmd.none
-                            )
-
-                        Err e ->
-                            ( ShowError <| "Failed to decode tabInfo: " ++ D.errorToString e
-                            , Cmd.none
-                            )
-
-                ( "tabInfo", Nothing ) ->
-                    ( ShowError <| "TabInfo had null data key", Cmd.none )
 
                 _ ->
                     ( ShowError <| "Unexpected message from JS" ++ action, Cmd.none )
@@ -614,13 +579,13 @@ saveLinkView link savedDateMaybe =
 
 {-| The view element when the user is not logged in yet
 -}
-authorizeView : Html.Html Msg
-authorizeView =
+unauthorizedView : Html.Html Msg
+unauthorizedView =
     layout <|
         E.column [ E.width E.fill, E.padding 10 ]
             [ header
             , E.el [ E.centerX, E.centerY, E.paddingXY 0 30 ] <|
-                createButton "Authorize" StartAuthorization
+                E.text "Please get an access token"
             ]
 
 
@@ -682,11 +647,14 @@ showMessageView msg extraAttributes =
 view : Model -> Html.Html Msg
 view model =
     case model of
+
+        Unauthorized ->
+            unauthorizedView
+
+        -- This state is used while we wait for an answer from the API
+        -- to check if a link has been previously saved
         Authorized _ _ _ ->
             loadingView
-
-        Unauthorized _ ->
-            authorizeView
 
         SavePage _ link _ savedDateMaybe ->
             saveLinkView link savedDateMaybe
@@ -721,12 +689,6 @@ main =
 messageToJs : SendMessage -> Cmd msg
 messageToJs msg =
     case msg of
-        GetTabInfoMessage ->
-            sendMessage { action = "getTabInfo", data = Nothing }
-
-        StartAuthorizationMessage ->
-            sendMessage { action = "auth", data = Nothing }
-
         LinkSavedMessage ->
             sendMessage { action = "success", data = Nothing }
 

@@ -25,9 +25,6 @@
     "default_title": "Linkhut",
     "default_popup": "popup/popup.html"
   },
-  "background": {
-        "page": "background/background.html"
-    },
   "options_ui": {
     "page": "options/options.html"
   }

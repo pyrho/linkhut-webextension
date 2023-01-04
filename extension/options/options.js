@@ -5184,8 +5184,6 @@ var $elm$core$Task$perform = F2(
 var $elm$browser$Browser$element = _Browser_element;
 var $elm$json$Json$Decode$field = _Json_decodeField;
 var $author$project$Options$defaultApiUrl = 'https://api.ln.ht/';
-var $author$project$Options$defaultClientId = '90e66396114916ee104193f7b1c6171dfc3e4a9497db246db60646ba8135b780';
-var $author$project$Options$defaultClientSecret = '62cf230387f4c1706dbe7edbc29a6fc5386f0f401af8c0a648038bba8c972aa8';
 var $author$project$Options$defaultWebUrl = 'https://ln.ht/';
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
 var $elm$core$Platform$Cmd$none = $elm$core$Platform$Cmd$batch(_List_Nil);
@@ -5201,13 +5199,11 @@ var $elm$core$Maybe$withDefault = F2(
 var $author$project$Options$init = function (_v0) {
 	var webUrl = _v0.webUrl;
 	var apiUrl = _v0.apiUrl;
-	var clientId = _v0.clientId;
-	var clientSecret = _v0.clientSecret;
+	var personalAccessToken = _v0.personalAccessToken;
 	return _Utils_Tuple2(
 		{
 			apiUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultApiUrl, apiUrl),
-			clientId: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultClientId, clientId),
-			clientSecret: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultClientSecret, clientSecret),
+			personalAccessToken: A2($elm$core$Maybe$withDefault, '', personalAccessToken),
 			webUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultWebUrl, webUrl)
 		},
 		$elm$core$Platform$Cmd$none);
@@ -5283,11 +5279,8 @@ var $author$project$Options$messageToJs = F2(
 						'apiUrl',
 						$elm$json$Json$Encode$string(model.apiUrl)),
 						_Utils_Tuple2(
-						'clientId',
-						$elm$json$Json$Encode$string(model.clientId)),
-						_Utils_Tuple2(
-						'clientSecret',
-						$elm$json$Json$Encode$string(model.clientSecret))
+						'personalAccessToken',
+						$elm$json$Json$Encode$string(model.personalAccessToken))
 					]));
 			return $author$project$Options$sendMessage(
 				{
@@ -5325,35 +5318,25 @@ var $author$project$Options$update = F2(
 				var message = msg.a;
 				if (message === 'resetDone') {
 					return _Utils_Tuple2(
-						{apiUrl: $author$project$Options$defaultApiUrl, clientId: $author$project$Options$defaultClientId, clientSecret: $author$project$Options$defaultClientSecret, webUrl: $author$project$Options$defaultWebUrl},
+						{apiUrl: $author$project$Options$defaultApiUrl, personalAccessToken: '', webUrl: $author$project$Options$defaultWebUrl},
 						$elm$core$Platform$Cmd$none);
 				} else {
 					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
 				}
-			case 'ClientIdUpdated':
-				var newId = msg.a;
-				return _Utils_Tuple2(
-					_Utils_update(
-						model,
-						{clientId: newId}),
-					$elm$core$Platform$Cmd$none);
 			default:
-				var newSecret = msg.a;
+				var newToken = msg.a;
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{clientSecret: newSecret}),
+						{personalAccessToken: newToken}),
 					$elm$core$Platform$Cmd$none);
 		}
 	});
 var $author$project$Options$ApiUrlUpdated = function (a) {
 	return {$: 'ApiUrlUpdated', a: a};
 };
-var $author$project$Options$ClientIdUpdated = function (a) {
-	return {$: 'ClientIdUpdated', a: a};
-};
-var $author$project$Options$ClientSecretUpdated = function (a) {
-	return {$: 'ClientSecretUpdated', a: a};
+var $author$project$Options$PersonalAccessTokenUpdated = function (a) {
+	return {$: 'PersonalAccessTokenUpdated', a: a};
 };
 var $author$project$Options$Reset = {$: 'Reset'};
 var $author$project$Options$Save = {$: 'Save'};
@@ -12563,8 +12546,7 @@ var $author$project$Options$view = function (model) {
 				[
 					A3($author$project$Options$inputField, model.webUrl, 'Web URL', $author$project$Options$WebUrlUpdated),
 					A3($author$project$Options$inputField, model.apiUrl, 'API URL', $author$project$Options$ApiUrlUpdated),
-					A3($author$project$Options$inputField, model.clientId, 'Oauth Client ID', $author$project$Options$ClientIdUpdated),
-					A3($author$project$Options$inputField, model.clientSecret, 'Oauth Client Secret', $author$project$Options$ClientSecretUpdated),
+					A3($author$project$Options$inputField, model.personalAccessToken, 'Personal Access Token', $author$project$Options$PersonalAccessTokenUpdated),
 					A2(
 					$mdgriffith$elm_ui$Element$row,
 					_List_fromArray(
@@ -12617,29 +12599,16 @@ _Platform_export({'Options':{'init':$author$project$Options$main(
 		function (webUrl) {
 			return A2(
 				$elm$json$Json$Decode$andThen,
-				function (clientSecret) {
+				function (personalAccessToken) {
 					return A2(
 						$elm$json$Json$Decode$andThen,
-						function (clientId) {
-							return A2(
-								$elm$json$Json$Decode$andThen,
-								function (apiUrl) {
-									return $elm$json$Json$Decode$succeed(
-										{apiUrl: apiUrl, clientId: clientId, clientSecret: clientSecret, webUrl: webUrl});
-								},
-								A2(
-									$elm$json$Json$Decode$field,
-									'apiUrl',
-									$elm$json$Json$Decode$oneOf(
-										_List_fromArray(
-											[
-												$elm$json$Json$Decode$null($elm$core$Maybe$Nothing),
-												A2($elm$json$Json$Decode$map, $elm$core$Maybe$Just, $elm$json$Json$Decode$string)
-											]))));
+						function (apiUrl) {
+							return $elm$json$Json$Decode$succeed(
+								{apiUrl: apiUrl, personalAccessToken: personalAccessToken, webUrl: webUrl});
 						},
 						A2(
 							$elm$json$Json$Decode$field,
-							'clientId',
+							'apiUrl',
 							$elm$json$Json$Decode$oneOf(
 								_List_fromArray(
 									[
@@ -12649,7 +12618,7 @@ _Platform_export({'Options':{'init':$author$project$Options$main(
 				},
 				A2(
 					$elm$json$Json$Decode$field,
-					'clientSecret',
+					'personalAccessToken',
 					$elm$json$Json$Decode$oneOf(
 						_List_fromArray(
 							[

@@ -1,5 +1,5 @@
 (async function elmbootstrap() {
-  async function getTabInfo() {
+  async function getTitleAndUrl() {
     const tabs = await browser.tabs.query({
       currentWindow: true,
       active: true,
@@ -9,20 +9,15 @@
     return { title, url };
   }
 
-  async function getCredentials() {
-    return (await browser.storage.local.get("credentials"))?.credentials ?? {};
-  }
-  function getAccessToken(credentials) {
-    return credentials?.access_token ?? null;
-  }
-
   const settings = (await browser.storage.local.get("settings"))?.settings;
+
+/// APP INIT
   var app = Elm.Popup.init({
     node: document.getElementById("elm"),
     flags: {
       apiUrl: settings?.apiUrl ?? null,
-      accessToken: await getCredentials().then(getAccessToken),
-      ...(await getTabInfo()),
+      accessToken: settings?.personalAccessToken ?? null,
+      ...(await getTitleAndUrl()),
     },
   });
 
@@ -32,20 +27,8 @@
     if (payload.action === "success") {
       setTimeout(() => window.close(), 1000);
       return;
-    } else if (payload.action === "getTabInfo") {
-      // This occurs when the user has not authorized the extension yet.
-      // So the popup shows the OAuth flow first, then asks for the tab Info.
-      app.ports.messageReceiver.send({
-        action: "tabInfo",
-        data: {
-          accessToken: await getCredentials().then(getAccessToken),
-          ...(await getTabInfo()),
-        },
-      });
-      return;
     } else {
-      // Send message to the background page
-      browser.runtime.sendMessage(payload);
+      console.error(`Should not happen, got message: ${JSON.stringify(payload, null, 2)}`)
     }
   });
 
