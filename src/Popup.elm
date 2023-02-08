@@ -87,7 +87,7 @@ fetchLinkDataFromApi currentUrl token apiUrl =
             ]
         , url =
             B.crossOrigin apiUrl
-                [ "_", "v1", "posts", "get" ]
+                [ "v1", "posts", "get" ]
                 [ B.string "url" currentUrl ]
         , body = Http.emptyBody
         , timeout = Nothing
@@ -406,7 +406,7 @@ postLink apiUrl token { url, description, extended, tags, dt, replace, shared } 
         builtUrl : String
         builtUrl =
             B.crossOrigin apiUrl
-                [ "_", "v1", "posts", "add" ]
+                [ "v1", "posts", "add" ]
                 queryParameters
 
         headers =
@@ -585,7 +585,11 @@ unauthorizedView =
         E.column [ E.width E.fill, E.padding 10 ]
             [ header
             , E.el [ E.centerX, E.centerY, E.paddingXY 0 30 ] <|
-                E.text "Please get an access token"
+                -- E.text "Please get an access token from here ",
+                E.link [] {
+                    url =  "https://ln.ht/_/oauth" 
+                ,label = E.text "Please get a personal access token from linkhut"
+                }
             ]
 
 

@@ -1,26 +1,22 @@
 {
 
-  "manifest_version": 2,
+  "manifest_version": 3,
   "name": "Linkhut Companion",
   "description": "Save bookmarks to linkhut",
   "version": "0.3.3",
-  "homepage_url": "https://git.sr.ht/~pyrho/linkhut-webextension",
+  "homepage_url": "https://github.com/pyrho/linkhut-webextension",
   "icons": {
     "48": "icons/icon.svg"
   },
   "permissions": [
     "activeTab",
     "identity",
-    "storage",
-    "<all_urls>"
+    "storage"
   ],
-  "browser_specific_settings": {
-      "gecko": {
-          "id": "linkhut-companion@ln.ht",
-          "strict_min_version": "80.0"
-      }
-  },
-  "browser_action": {
+  "host_permissions": [
+    "*://api.ln.ht/*"
+  ],
+  "action": {
     "default_icon": "icons/icon.svg",
     "default_title": "Linkhut",
     "default_popup": "popup/popup.html"

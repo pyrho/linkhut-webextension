@@ -5183,6 +5183,15 @@ var $elm$core$Task$perform = F2(
 	});
 var $elm$browser$Browser$element = _Browser_element;
 var $elm$json$Json$Decode$field = _Json_decodeField;
+var $elm$core$Maybe$andThen = F2(
+	function (callback, maybeValue) {
+		if (maybeValue.$ === 'Just') {
+			var value = maybeValue.a;
+			return callback(value);
+		} else {
+			return $elm$core$Maybe$Nothing;
+		}
+	});
 var $author$project$Options$defaultApiUrl = 'https://api.ln.ht/';
 var $author$project$Options$defaultWebUrl = 'https://ln.ht/';
 var $elm$core$Platform$Cmd$batch = _Platform_batch;
@@ -5203,7 +5212,12 @@ var $author$project$Options$init = function (_v0) {
 	return _Utils_Tuple2(
 		{
 			apiUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultApiUrl, apiUrl),
-			personalAccessToken: A2($elm$core$Maybe$withDefault, '', personalAccessToken),
+			personalAccessToken: A2(
+				$elm$core$Maybe$andThen,
+				function (pat) {
+					return $elm$core$String$isEmpty(pat) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(pat);
+				},
+				personalAccessToken),
 			webUrl: A2($elm$core$Maybe$withDefault, $author$project$Options$defaultWebUrl, webUrl)
 		},
 		$elm$core$Platform$Cmd$none);
@@ -5280,7 +5294,8 @@ var $author$project$Options$messageToJs = F2(
 						$elm$json$Json$Encode$string(model.apiUrl)),
 						_Utils_Tuple2(
 						'personalAccessToken',
-						$elm$json$Json$Encode$string(model.personalAccessToken))
+						$elm$json$Json$Encode$string(
+							A2($elm$core$Maybe$withDefault, '', model.personalAccessToken)))
 					]));
 			return $author$project$Options$sendMessage(
 				{
@@ -5318,7 +5333,7 @@ var $author$project$Options$update = F2(
 				var message = msg.a;
 				if (message === 'resetDone') {
 					return _Utils_Tuple2(
-						{apiUrl: $author$project$Options$defaultApiUrl, personalAccessToken: '', webUrl: $author$project$Options$defaultWebUrl},
+						{apiUrl: $author$project$Options$defaultApiUrl, personalAccessToken: $elm$core$Maybe$Nothing, webUrl: $author$project$Options$defaultWebUrl},
 						$elm$core$Platform$Cmd$none);
 				} else {
 					return _Utils_Tuple2(model, $elm$core$Platform$Cmd$none);
@@ -5328,7 +5343,9 @@ var $author$project$Options$update = F2(
 				return _Utils_Tuple2(
 					_Utils_update(
 						model,
-						{personalAccessToken: newToken}),
+						{
+							personalAccessToken: $elm$core$String$isEmpty(newToken) ? $elm$core$Maybe$Nothing : $elm$core$Maybe$Just(newToken)
+						}),
 					$elm$core$Platform$Cmd$none);
 		}
 	});
@@ -12546,7 +12563,11 @@ var $author$project$Options$view = function (model) {
 				[
 					A3($author$project$Options$inputField, model.webUrl, 'Web URL', $author$project$Options$WebUrlUpdated),
 					A3($author$project$Options$inputField, model.apiUrl, 'API URL', $author$project$Options$ApiUrlUpdated),
-					A3($author$project$Options$inputField, model.personalAccessToken, 'Personal Access Token', $author$project$Options$PersonalAccessTokenUpdated),
+					A3(
+					$author$project$Options$inputField,
+					A2($elm$core$Maybe$withDefault, '', model.personalAccessToken),
+					'Personal Access Token',
+					$author$project$Options$PersonalAccessTokenUpdated),
 					A2(
 					$mdgriffith$elm_ui$Element$row,
 					_List_fromArray(

@@ -2,7 +2,8 @@ _default:
   @just --list
 
 # Package the extension into a zip
-build: _build-extension _build-elm
+build: _build-extension _build-elm _copy_vendor
+watch: _options-watch _popup-watch
 
 _build-extension: install-dependencies
     npx web-ext build -s extension -o
@@ -38,7 +39,11 @@ _extension-watch:
     npx web-ext run --verbose -s extension
 
 _options-watch:
-    elm-live src/Options.elm --start-page=extension/options/options.html -- --output=extension/options/options.js
+    npx elm-live src/Options.elm --start-page=extension/options/options.html -- --output=extension/options/options.js
 
 _popup-watch:
-    elm-live src/Popup.elm --start-page=extension/popup/popup.html -- --output=extension/popup/elm.js
+    npx elm-live src/Popup.elm --start-page=extension/popup/popup.html -- --output=extension/popup/elm.js
+
+_copy_vendor:
+    cp node_modules/webextension-polyfill/dist/browser-polyfill.min.js extension/popup/.
+    cp node_modules/webextension-polyfill/dist/browser-polyfill.min.js extension/options/.

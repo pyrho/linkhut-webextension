@@ -10,12 +10,14 @@
   "author": "",
   "license": "ISC",
   "devDependencies": {
+    "elm-format": "^0.8.5",
+    "elm-live": "^4.0.2",
     "elm-review": "^2.5.3",
-    "web-ext": "^6.2.0"
+    "web-ext": "^6.2.0",
+    "webextension-polyfill": "^0.10.0"
   },
   "dependencies": {
     "concurrently": "^6.2.0",
-    "elm-json": "^0.2.10",
-    "elm-live": "^4.0.2"
+    "elm-json": "^0.2.10"
   }
 }

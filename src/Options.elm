@@ -26,6 +26,7 @@ defaultApiUrl =
     "https://api.ln.ht/"
 
 
+
 -- TYPES
 
 
@@ -59,7 +60,7 @@ type alias Flags =
 type alias Model =
     { webUrl : String
     , apiUrl : String
-    , personalAccessToken : String
+    , personalAccessToken : Maybe String
     }
 
 
@@ -71,7 +72,16 @@ init : Flags -> ( Model, Cmd Msg )
 init { webUrl, apiUrl, personalAccessToken } =
     ( { webUrl = Maybe.withDefault defaultWebUrl webUrl
       , apiUrl = Maybe.withDefault defaultApiUrl apiUrl
-      , personalAccessToken = Maybe.withDefault "" personalAccessToken 
+      , personalAccessToken =
+            personalAccessToken
+                |> Maybe.andThen
+                    (\pat ->
+                        if String.isEmpty pat then
+                            Nothing
+
+                        else
+                            Just pat
+                    )
       }
     , Cmd.none
     )
@@ -101,7 +111,7 @@ view model =
             [ width fill, centerY, centerX, spacing 10 ]
             [ inputField model.webUrl "Web URL" WebUrlUpdated
             , inputField model.apiUrl "API URL" ApiUrlUpdated
-            , inputField model.personalAccessToken "Personal Access Token" PersonalAccessTokenUpdated 
+            , inputField (Maybe.withDefault "" model.personalAccessToken) "Personal Access Token" PersonalAccessTokenUpdated
             , row [ centerX, spacing 50 ]
                 [ Input.button
                     [ Background.color <| yellow
@@ -153,7 +163,7 @@ update msg model =
                 "resetDone" ->
                     ( { webUrl = defaultWebUrl
                       , apiUrl = defaultApiUrl
-                      , personalAccessToken = ""
+                      , personalAccessToken = Nothing
                       }
                     , Cmd.none
                     )
@@ -162,7 +172,8 @@ update msg model =
                     ( model, Cmd.none )
 
         PersonalAccessTokenUpdated newToken ->
-            ( { model | personalAccessToken = newToken }, Cmd.none )
+            ( { model | personalAccessToken = if String.isEmpty newToken then Nothing else Just newToken}, Cmd.none )
+
 
 
 -- SUBSCRIPTIONS
@@ -199,7 +210,7 @@ messageToJs msg model =
                     Json.Encode.object
                         [ ( "webUrl", Json.Encode.string model.webUrl )
                         , ( "apiUrl", Json.Encode.string model.apiUrl )
-                        , ( "personalAccessToken", Json.Encode.string model.personalAccessToken )
+                        , ( "personalAccessToken", Json.Encode.string (Maybe.withDefault "" model.personalAccessToken) )
                         ]
             in
             sendMessage { action = "save", data = Just <| data }
