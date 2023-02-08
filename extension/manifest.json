@@ -3,7 +3,7 @@
     "manifest_version": 3,
     "name": "Linkhut Companion",
     "description": "Save bookmarks to linkhut",
-    "version": "0.3.3",
+    "version": "0.4.1",
     "homepage_url": "https://github.com/pyrho/linkhut-webextension",
     "icons": {
         "48": "icons/icon.svg"
@@ -27,7 +27,7 @@
     "browser_specific_settings": {
         "gecko": {
             "id": "linkhut-companion@ln.ht",
-            "strict_min_version": "101.0"
+            "strict_min_version": "109.0"
         }
     }
 }
