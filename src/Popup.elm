@@ -170,12 +170,6 @@ type alias JSMessage =
     }
 
 
-type alias JSMessageGetTabInfo =
-    { url : String
-    , title : String
-    }
-
-
 type Msg
     = Recv JSMessage
     | UpdateUrl String
@@ -276,13 +270,6 @@ subscriptions _ =
 
 
 -- UPDATE
-
-
-tabInfoDecoder : D.Decoder JSMessageGetTabInfo
-tabInfoDecoder =
-    D.map2 JSMessageGetTabInfo
-        (D.field "url" D.string)
-        (D.field "title" D.string)
 
 
 update : Msg -> Model -> ( Model, Cmd Msg )
